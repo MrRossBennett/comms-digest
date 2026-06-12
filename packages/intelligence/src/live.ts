@@ -7,7 +7,7 @@ import { modelExtractionSchema, type ModelExtraction, type SchoolCommunication }
 export const liveModelConfigSchema = z.object({
   provider: z.literal("anthropic").default("anthropic"),
   modelId: z.string().min(1).default("claude-haiku-4-5-20251001"),
-  promptVersion: z.string().min(1).default("school-extraction-v1"),
+  promptVersion: z.string().min(1).default("school-extraction-v2"),
   apiKey: z.preprocess((value) => (value === "" ? undefined : value), z.string().min(1).optional()),
 });
 
@@ -43,13 +43,23 @@ type LiveRunMetadata = {
 
 const extractionInstructions = `Extract grounded school Claims and Household Owner Responsibilities.
 Return no identifiers. Responsibilities must reference zero-based Claim positions.
-Every Claim must include exact Citation quotes and JavaScript string start/end offsets.
-Preserve original Audience and relative-date wording.
-Resolve dates from receivedAt in householdTimezone. Use null when wording is ambiguous.
+Every Claim needs one or more Citations. A Citation quote must be an exact substring of sourceText, and its start and end must be zero-based character offsets such that sourceText.slice(start, end) equals the quote exactly.
+Preserve the original Audience wording and the original relative-date wording.
+Resolve each date to an ISO date (YYYY-MM-DD) relative to the received date stated below, in the household timezone. "next <weekday>" means that weekday in the following week, never the same week. Use null when the wording is genuinely ambiguous.
 Do not invent information that is not supported by an exact Citation.`;
 
 function buildPrompt(communication: SchoolCommunication) {
+  const receivedOn = new Intl.DateTimeFormat("en-GB", {
+    timeZone: communication.householdTimezone,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(communication.receivedAt));
+
   return `${extractionInstructions}
+
+This communication was received on ${receivedOn} (${communication.householdTimezone}). Resolve every relative date relative to that date.
 
 School Communication:
 ${JSON.stringify(communication, null, 2)}`;

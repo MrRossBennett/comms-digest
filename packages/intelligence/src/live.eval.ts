@@ -8,7 +8,7 @@ import { createExtractionWorkflow } from "./workflow";
 const live = createLiveExtractor({
   provider: "anthropic",
   modelId: process.env.INTELLIGENCE_MODEL_ID ?? "claude-haiku-4-5-20251001",
-  promptVersion: process.env.INTELLIGENCE_PROMPT_VERSION ?? "school-extraction-v1",
+  promptVersion: process.env.INTELLIGENCE_PROMPT_VERSION ?? "school-extraction-v2",
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 const workflow = createExtractionWorkflow({ extract: live.extract });
@@ -67,7 +67,7 @@ Eval("Comms Digest", {
   metadata: {
     provider: "anthropic",
     modelId: process.env.INTELLIGENCE_MODEL_ID ?? "claude-haiku-4-5-20251001",
-    promptVersion: process.env.INTELLIGENCE_PROMPT_VERSION ?? "school-extraction-v1",
+    promptVersion: process.env.INTELLIGENCE_PROMPT_VERSION ?? "school-extraction-v2",
     fixture: "year-4-swimming",
   },
   tags: ["synthetic", "tracer-bullet"],
