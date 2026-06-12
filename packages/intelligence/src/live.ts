@@ -3,6 +3,7 @@ import { generateText, Output } from "ai";
 import { z } from "zod";
 
 import { modelExtractionSchema, type ModelExtraction, type SchoolCommunication } from "./contracts";
+import { alignExtractionCitations } from "./grounding";
 
 export const liveModelConfigSchema = z.object({
   provider: z.literal("anthropic").default("anthropic"),
@@ -108,6 +109,7 @@ export function createLiveExtractor(
       );
       const inputTokens = result.usage.inputTokens ?? 0;
       const outputTokens = result.usage.outputTokens ?? 0;
+      const extraction = alignExtractionCitations(communication.sourceText, result.output);
 
       lastRunMetadata = {
         provider: config.provider,
@@ -120,7 +122,7 @@ export function createLiveExtractor(
         estimatedCostUsd: (inputTokens + outputTokens * 5) / 1_000_000,
       };
 
-      return result.output;
+      return extraction;
     },
     getLastRunMetadata: () => {
       if (!lastRunMetadata) {

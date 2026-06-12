@@ -5,6 +5,7 @@ import {
   modelExtractionSchema,
   schoolCommunicationSchema,
   validatedExtractionSchema,
+  type ModelExtraction,
 } from "./contracts";
 import { resolveRelativeDate } from "./dates";
 
@@ -15,6 +16,46 @@ export class GroundingError extends Error {
     super(message);
     this.name = "GroundingError";
   }
+}
+
+/**
+ * Derive each Citation's character offsets from its verbatim quote rather than trusting
+ * the offsets the model produced. The milestone-1 baseline showed the model copies short
+ * quotes reliably but miscounts character positions, so we treat the model's `start` as a
+ * hint and snap to the nearest exact occurrence of the quote in the source text. Quotes
+ * that are not a verbatim substring are left untouched, so {@link validateAndIdentifyExtraction}
+ * still fails closed on genuinely ungrounded claims. See issue #1 (Citation offsets decision).
+ */
+export function alignExtractionCitations(
+  sourceText: string,
+  extraction: ModelExtraction,
+): ModelExtraction {
+  return {
+    ...extraction,
+    claims: extraction.claims.map((claim) => ({
+      ...claim,
+      citations: claim.citations.map((citation) => {
+        const occurrences: number[] = [];
+        for (
+          let index = sourceText.indexOf(citation.quote);
+          index !== -1;
+          index = sourceText.indexOf(citation.quote, index + 1)
+        ) {
+          occurrences.push(index);
+        }
+
+        if (occurrences.length === 0) {
+          return citation;
+        }
+
+        const start = occurrences.reduce((best, candidate) =>
+          Math.abs(candidate - citation.start) < Math.abs(best - citation.start) ? candidate : best,
+        );
+
+        return { ...citation, start, end: start + citation.quote.length };
+      }),
+    })),
+  };
 }
 
 export function validateAndIdentifyExtraction(
