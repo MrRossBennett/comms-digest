@@ -60,3 +60,17 @@ Docs are local at `node_modules/vite-plus/docs` or online at https://viteplus.de
 - [ ] If setup, runtime, or package-manager behavior looks wrong, run `vp env doctor` and include its output when asking for help.
 
 <!--VITE PLUS END-->
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in GitHub Issues for `MrRossBennett/comms-digest`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the standard five-label triage vocabulary. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This is a single-context repository with `CONTEXT.md` and `docs/adr/`. See `docs/agents/domain.md`.
