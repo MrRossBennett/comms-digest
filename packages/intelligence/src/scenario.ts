@@ -1,0 +1,265 @@
+import { digestGroundTruthSchema } from "./benchmark";
+import { schoolCommunicationSchema, validatedExtractionSchema } from "./contracts";
+import { digestSchema, householdDigestConfigSchema, reconciliationSchema } from "./digest";
+
+const childId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c01";
+const announcementId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c02";
+const announcementEventClaimId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c03";
+const announcementEventCitationId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c04";
+const announcementPaymentClaimId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c05";
+const announcementPaymentCitationId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c06";
+const announcementResponsibilityId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c07";
+const reminderId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c08";
+const reminderClaimId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c09";
+const reminderCitationId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c0a";
+const reminderResponsibilityId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c0b";
+const cancellationId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c0c";
+const cancellationClaimId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c0d";
+const cancellationCitationId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c0e";
+const year6Id = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c0f";
+const year6ClaimId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c10";
+const year6CitationId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c11";
+
+function citation(communicationId: string, id: string, sourceText: string, quote: string) {
+  const start = sourceText.indexOf(quote);
+  return { id, communicationId, quote, start, end: start + quote.length };
+}
+
+function communication(id: string, receivedAt: string, subject: string, sourceText: string) {
+  return schoolCommunicationSchema.parse({
+    id,
+    kind: "email",
+    receivedAt,
+    householdTimezone: "Europe/London",
+    subject,
+    sourceText,
+  });
+}
+
+const announcementText =
+  "Year 4 swimming starts on Monday 19 January. Please pay £12 by Friday 16 January.";
+const announcementEventQuote = "Year 4 swimming starts on Monday 19 January.";
+const announcementPaymentQuote = "Please pay £12 by Friday 16 January.";
+const reminderText = "Reminder for Year 4 families: please pay £12 for swimming by Friday.";
+const reminderQuote = "please pay £12 for swimming by Friday.";
+const cancellationText = "Year 4 swimming on Monday 19 January has been cancelled.";
+const cancellationQuote = cancellationText;
+const year6Text = "Year 6 disco tickets are now available.";
+const year6Quote = year6Text;
+
+const extractions = [
+  validatedExtractionSchema.parse({
+    communication: communication(
+      announcementId,
+      "2026-01-12T16:30:00.000Z",
+      "Year 4 swimming",
+      announcementText,
+    ),
+    claims: [
+      {
+        id: announcementEventClaimId,
+        content: "Year 4 swimming starts on 19 January 2026.",
+        audience: { scope: "group", originalWording: "Year 4" },
+        certainty: "confirmed",
+        date: { originalWording: "Monday 19 January", resolvedDate: "2026-01-19" },
+        citations: [
+          citation(
+            announcementId,
+            announcementEventCitationId,
+            announcementText,
+            announcementEventQuote,
+          ),
+        ],
+      },
+      {
+        id: announcementPaymentClaimId,
+        content: "Year 4 swimming payment of £12 is due by 16 January 2026.",
+        audience: { scope: "group", originalWording: "Year 4" },
+        certainty: "confirmed",
+        date: { originalWording: "Friday 16 January", resolvedDate: "2026-01-16" },
+        citations: [
+          citation(
+            announcementId,
+            announcementPaymentCitationId,
+            announcementText,
+            announcementPaymentQuote,
+          ),
+        ],
+      },
+    ],
+    responsibilities: [
+      {
+        id: announcementResponsibilityId,
+        title: "Pay £12 for Year 4 swimming",
+        dueDate: { originalWording: "Friday 16 January", resolvedDate: "2026-01-16" },
+        amount: { currency: "GBP", minorUnits: 1200 },
+        supportingClaimIds: [announcementPaymentClaimId],
+      },
+    ],
+  }),
+  validatedExtractionSchema.parse({
+    communication: communication(
+      reminderId,
+      "2026-01-14T16:30:00.000Z",
+      "Swimming payment reminder",
+      reminderText,
+    ),
+    claims: [
+      {
+        id: reminderClaimId,
+        content: "Year 4 swimming payment of £12 remains due by 16 January 2026.",
+        audience: { scope: "group", originalWording: "Year 4 families" },
+        certainty: "confirmed",
+        date: { originalWording: "Friday", resolvedDate: "2026-01-16" },
+        citations: [citation(reminderId, reminderCitationId, reminderText, reminderQuote)],
+      },
+    ],
+    responsibilities: [
+      {
+        id: reminderResponsibilityId,
+        title: "Pay £12 for Year 4 swimming",
+        dueDate: { originalWording: "Friday", resolvedDate: "2026-01-16" },
+        amount: { currency: "GBP", minorUnits: 1200 },
+        supportingClaimIds: [reminderClaimId],
+      },
+    ],
+  }),
+  validatedExtractionSchema.parse({
+    communication: communication(
+      cancellationId,
+      "2026-01-15T16:30:00.000Z",
+      "Swimming cancelled",
+      cancellationText,
+    ),
+    claims: [
+      {
+        id: cancellationClaimId,
+        content: "Year 4 swimming on 19 January 2026 has been cancelled.",
+        audience: { scope: "group", originalWording: "Year 4" },
+        certainty: "confirmed",
+        date: { originalWording: "Monday 19 January", resolvedDate: "2026-01-19" },
+        citations: [
+          citation(cancellationId, cancellationCitationId, cancellationText, cancellationQuote),
+        ],
+      },
+    ],
+    responsibilities: [],
+  }),
+  validatedExtractionSchema.parse({
+    communication: communication(year6Id, "2026-01-15T17:00:00.000Z", "Year 6 disco", year6Text),
+    claims: [
+      {
+        id: year6ClaimId,
+        content: "Year 6 disco tickets are available.",
+        audience: { scope: "group", originalWording: "Year 6" },
+        certainty: "confirmed",
+        citations: [citation(year6Id, year6CitationId, year6Text, year6Quote)],
+      },
+    ],
+    responsibilities: [],
+  }),
+];
+
+export const multiCommunicationScenario = {
+  household: householdDigestConfigSchema.parse({
+    children: [{ id: childId, name: "Alex", schoolYear: "Year 4" }],
+  }),
+  extractions,
+  reconciliation: reconciliationSchema.parse({
+    items: [
+      {
+        section: "act_now",
+        title: "Pay £12 for Year 4 swimming",
+        claimIds: [announcementPaymentClaimId, reminderClaimId],
+        responsibilityIds: [announcementResponsibilityId, reminderResponsibilityId],
+      },
+      {
+        section: "good_to_know",
+        title: "Year 4 swimming has been cancelled",
+        claimIds: [cancellationClaimId],
+        responsibilityIds: [],
+      },
+      {
+        section: "good_to_know",
+        title: "Year 6 disco tickets are available",
+        claimIds: [year6ClaimId],
+        responsibilityIds: [],
+      },
+    ],
+  }),
+};
+
+const claimsById = new Map(
+  extractions.flatMap(({ claims }) => claims).map((claim) => [claim.id, claim]),
+);
+const responsibilitiesById = new Map(
+  extractions
+    .flatMap(({ responsibilities }) => responsibilities)
+    .map((responsibility) => [responsibility.id, responsibility]),
+);
+
+function requireClaim(id: string) {
+  const claim = claimsById.get(id);
+  if (!claim) throw new Error(`Scenario is missing Claim ${id}`);
+  return claim;
+}
+
+function requireResponsibility(id: string) {
+  const responsibility = responsibilitiesById.get(id);
+  if (!responsibility) throw new Error(`Scenario is missing Responsibility ${id}`);
+  return responsibility;
+}
+
+export const multiCommunicationBenchmark = {
+  scenario: {
+    household: multiCommunicationScenario.household,
+    extractions: multiCommunicationScenario.extractions,
+  },
+  pipelineReconciliation: multiCommunicationScenario.reconciliation,
+  expected: digestGroundTruthSchema.parse({
+    items: [
+      {
+        section: "act_now",
+        title: "Pay £12 for Year 4 swimming",
+        childIds: [childId],
+      },
+      {
+        section: "good_to_know",
+        title: "Year 4 swimming has been cancelled",
+        childIds: [childId],
+      },
+    ],
+  }),
+  naive: digestSchema.parse({
+    actNow: [
+      {
+        title: "Pay £12 for Year 4 swimming",
+        childIds: [childId],
+        claims: [requireClaim(announcementPaymentClaimId)],
+        responsibilities: [requireResponsibility(announcementResponsibilityId)],
+      },
+      {
+        title: "Remember to pay for swimming",
+        childIds: [childId],
+        claims: [requireClaim(reminderClaimId)],
+        responsibilities: [requireResponsibility(reminderResponsibilityId)],
+      },
+    ],
+    comingUp: [
+      {
+        title: "Year 4 swimming starts on 19 January",
+        childIds: [childId],
+        claims: [requireClaim(announcementEventClaimId)],
+        responsibilities: [],
+      },
+    ],
+    goodToKnow: [
+      {
+        title: "Year 6 disco tickets are available",
+        childIds: [childId],
+        claims: [requireClaim(year6ClaimId)],
+        responsibilities: [],
+      },
+    ],
+  }),
+};
