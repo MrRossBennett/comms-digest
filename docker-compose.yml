@@ -2,13 +2,13 @@ services:
   db:
     image: postgres:alpine
     ports:
-      - 5432:5432
+      - 5434:5432
     volumes:
-      - postgres_data_tanstarter:/var/lib/postgresql
+      - postgres_data_comms_digest:/var/lib/postgresql
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=tanstarter
+      - POSTGRES_DB=comms_digest
 
 volumes:
-  postgres_data_tanstarter:
+  postgres_data_comms_digest:
