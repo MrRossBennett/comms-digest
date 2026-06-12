@@ -8,7 +8,7 @@ import { alignExtractionCitations } from "./grounding";
 export const liveModelConfigSchema = z.object({
   provider: z.literal("anthropic").default("anthropic"),
   modelId: z.string().min(1).default("claude-haiku-4-5-20251001"),
-  promptVersion: z.string().min(1).default("school-extraction-v2"),
+  promptVersion: z.string().min(1).default("school-extraction-v4"),
   apiKey: z.preprocess((value) => (value === "" ? undefined : value), z.string().min(1).optional()),
 });
 
@@ -45,7 +45,12 @@ type LiveRunMetadata = {
 const extractionInstructions = `Extract grounded school Claims and Household Owner Responsibilities.
 Return no identifiers. Responsibilities must reference zero-based Claim positions.
 Every Claim needs one or more Citations. A Citation quote must be an exact substring of sourceText, and its start and end must be zero-based character offsets such that sourceText.slice(start, end) equals the quote exactly.
-Preserve the original Audience wording and the original relative-date wording.
+
+A Claim represents a meaningful piece of information — an activity, a payment, an event. A bare date phrase is not a Claim on its own. When a Claim's activity or event has a date, always populate the Claim's date field with the original wording and the resolved date.
+Claim content is a concise synthesized statement in plain language. Embed resolved dates in the content where relevant (e.g. "Year 4 swimming lessons start on 19 January 2026.").
+
+Audience scope: use "child" for a named child, "group" for a year group or class, "school" for the whole school, "household" for all household members, "unresolved" when genuinely unclear. Preserve the original wording in originalWording separately.
+Preserve the original relative-date wording in date fields.
 Resolve each date to an ISO date (YYYY-MM-DD) relative to the received date stated below, in the household timezone. "next <weekday>" means that weekday in the following week, never the same week. Use null when the wording is genuinely ambiguous.
 Do not invent information that is not supported by an exact Citation.`;
 
