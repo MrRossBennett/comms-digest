@@ -1,0 +1,66 @@
+{
+  "claims": [
+    {
+      "content": "Year 4 swimming lessons start on 19 January 2026.",
+      "audience": {
+        "scope": "group",
+        "originalWording": "Year 4"
+      },
+      "certainty": "confirmed",
+      "date": {
+        "originalWording": "next Monday",
+        "resolvedDate": "2026-01-19"
+      },
+      "citations": [
+        {
+          "quote": "Year 4",
+          "start": 5,
+          "end": 11
+        },
+        {
+          "quote": "Swimming lessons start next Monday.",
+          "start": 23,
+          "end": 58
+        }
+      ]
+    },
+    {
+      "content": "A £12 swimming payment is due by 16 January 2026.",
+      "audience": {
+        "scope": "group",
+        "originalWording": "Year 4"
+      },
+      "certainty": "confirmed",
+      "date": {
+        "originalWording": "Friday",
+        "resolvedDate": "2026-01-16"
+      },
+      "citations": [
+        {
+          "quote": "Year 4",
+          "start": 5,
+          "end": 11
+        },
+        {
+          "quote": "Please pay £12 by Friday so your child can take part.",
+          "start": 59,
+          "end": 112
+        }
+      ]
+    }
+  ],
+  "responsibilities": [
+    {
+      "title": "Pay £12 for Year 4 swimming",
+      "dueDate": {
+        "originalWording": "Friday",
+        "resolvedDate": "2026-01-16"
+      },
+      "amount": {
+        "currency": "GBP",
+        "minorUnits": 1200
+      },
+      "claimPositions": [1]
+    }
+  ]
+}

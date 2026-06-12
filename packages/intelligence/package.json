@@ -1,0 +1,30 @@
+{
+  "name": "@repo/intelligence",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./evaluation": "./src/evaluation.ts",
+    "./fixtures": "./src/fixtures.ts",
+    "./live": "./src/live.ts"
+  },
+  "scripts": {
+    "experiment": "braintrust eval --env-file ../../apps/web/.env src/live.eval.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "catalog:",
+    "@langchain/langgraph": "catalog:",
+    "ai": "catalog:",
+    "braintrust": "catalog:",
+    "uuid": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@repo/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
