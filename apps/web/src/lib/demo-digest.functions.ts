@@ -29,7 +29,7 @@ export const $setDemoResponsibilityCompleted = createServerFn({
     }),
   )
   .handler(async ({ data, context }) => {
-    if (!isDemoResponsibilityId(data.responsibilityId)) {
+    if (!(await isDemoResponsibilityId(data.responsibilityId))) {
       throw new Error("Unknown Demo Household Responsibility");
     }
 
