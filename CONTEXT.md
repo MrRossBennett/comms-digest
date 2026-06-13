@@ -5,7 +5,7 @@ Comms Digest helps a household understand and act on school communications conce
 ## Language
 
 **Household**:
-The family unit whose school communications and responsibilities are collected into one view. A **Household** has one **Household Owner** and one or more **Children** in the first version.
+The family unit whose school communications and responsibilities are collected into one view. A **Household** has one **Household Owner**, one or more **Schools**, and one or more **Children** in the first version. It receives one combined **Digest** across all of its **Schools**.
 _Avoid_: Account, tenant, customer
 
 **Household Owner**:
@@ -22,7 +22,7 @@ The first version stores only a display name chosen by the **Household Owner**, 
 _Avoid_: Student, pupil, dependent
 
 **School**:
-An educational organisation attended by one or more **Children** in a **Household** and responsible for issuing relevant **School Communications**.
+An educational organisation attended by one or more **Children** in a **Household** and responsible for issuing relevant **School Communications**. Each **Child** belongs to one **School** in the first version; a **Household** may contain multiple **Schools**.
 _Avoid_: Institution, organisation, provider
 
 **School Communication**:
