@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./demo": "./src/demo.ts",
     "./evaluation": "./src/evaluation.ts",
     "./fixtures": "./src/fixtures.ts",
     "./live": "./src/live.ts"

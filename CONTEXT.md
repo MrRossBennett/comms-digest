@@ -12,6 +12,10 @@ _Avoid_: Account, tenant, customer
 The adult responsible for configuring a **Household** and reviewing its **Digest**. The first version has exactly one **Household Owner** per **Household**.
 _Avoid_: User, administrator, parent account
 
+**Demo Household**:
+A clearly labelled synthetic **Household** used to let an authenticated **Household Owner** experience Comms Digest before onboarding is available. It must not be presented as belonging to the **Household Owner** or replace the future creation of their own **Household**.
+_Avoid_: Default household, sample account
+
 **Child**:
 A young person in a **Household** whose **School** and school year help determine which communications are relevant.
 _Avoid_: Student, pupil, dependent
@@ -53,7 +57,7 @@ A proposed calendar entry derived from a **School Communication** that the **Hou
 _Avoid_: Calendar event, automatic event
 
 **Responsibility**:
-Something the **Household Owner** must do or decide in response to a **School Communication**, supported by one or more **Claims**. A **Responsibility** is unresolved, completed, dismissed, or superseded; recurring responsibilities are represented as separate dated occurrences.
+Something the **Household Owner** must do or decide in response to a **School Communication**, supported by one or more **Claims**. A **Responsibility** is unresolved, completed, dismissed, or superseded; a later **School Communication** may supersede it when the underlying activity is cancelled or changed, unless that communication says the responsibility remains. Recurring responsibilities are represented as separate dated occurrences.
 _Avoid_: Action, task, to-do
 
 **Audience**:
