@@ -4,6 +4,7 @@ import { Button } from "@repo/ui/components/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -53,10 +54,12 @@ function AccountMenu({ name, email }: { name: string; email: string }) {
         <UserIcon />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel className="space-y-0.5">
-          <span className="block font-medium text-foreground">{name}</span>
-          <span className="block truncate">{email}</span>
-        </DropdownMenuLabel>
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="space-y-0.5">
+            <span className="block font-medium text-foreground">{name}</span>
+            <span className="block truncate">{email}</span>
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           variant="destructive"
