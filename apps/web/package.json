@@ -13,6 +13,7 @@
     "@icons-pack/react-simple-icons": "catalog:",
     "@repo/auth": "workspace:*",
     "@repo/db": "workspace:*",
+    "@repo/intelligence": "workspace:*",
     "@repo/ui": "workspace:*",
     "@tanstack/react-form-start": "catalog:",
     "@tanstack/react-query": "catalog:",

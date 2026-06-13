@@ -168,16 +168,15 @@ export const multiCommunicationScenario = {
   reconciliation: reconciliationSchema.parse({
     items: [
       {
-        section: "act_now",
-        title: "Pay £12 for Year 4 swimming",
-        claimIds: [announcementPaymentClaimId, reminderClaimId],
-        responsibilityIds: [announcementResponsibilityId, reminderResponsibilityId],
-      },
-      {
         section: "good_to_know",
         title: "Year 4 swimming has been cancelled",
-        claimIds: [cancellationClaimId],
-        responsibilityIds: [],
+        claimIds: [
+          announcementEventClaimId,
+          announcementPaymentClaimId,
+          reminderClaimId,
+          cancellationClaimId,
+        ],
+        responsibilityIds: [announcementResponsibilityId, reminderResponsibilityId],
       },
       {
         section: "good_to_know",
@@ -218,11 +217,6 @@ export const multiCommunicationBenchmark = {
   pipelineReconciliation: multiCommunicationScenario.reconciliation,
   expected: digestGroundTruthSchema.parse({
     items: [
-      {
-        section: "act_now",
-        title: "Pay £12 for Year 4 swimming",
-        childIds: [childId],
-      },
       {
         section: "good_to_know",
         title: "Year 4 swimming has been cancelled",

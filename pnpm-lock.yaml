@@ -199,6 +199,9 @@ importers:
       '@repo/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@repo/intelligence':
+        specifier: workspace:*
+        version: link:../../packages/intelligence
       '@repo/ui':
         specifier: workspace:*
         version: link:../../packages/ui
