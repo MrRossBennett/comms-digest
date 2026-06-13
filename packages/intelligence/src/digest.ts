@@ -48,6 +48,8 @@ export const digestSchema = z
   })
   .strict();
 
+export type Digest = z.infer<typeof digestSchema>;
+
 const composeDigestInputSchema = z
   .object({
     household: householdDigestConfigSchema,
