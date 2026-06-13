@@ -1,5 +1,7 @@
 import { digestGroundTruthSchema } from "./benchmark";
 import { schoolCommunicationSchema, validatedExtractionSchema } from "./contracts";
+import { createRecordedCorpusExtractor, extractCorpus } from "./corpus-pipeline";
+import { demoCorpus, demoHousehold } from "./demo-corpus";
 import { digestSchema, householdDigestConfigSchema, reconciliationSchema } from "./digest";
 
 const alexId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c01";
@@ -276,7 +278,6 @@ export const multiCommunicationBenchmark = {
     household: multiCommunicationScenario.household,
     extractions: multiCommunicationScenario.extractions,
   },
-  pipelineReconciliation: multiCommunicationScenario.reconciliation,
   expected: digestGroundTruthSchema.parse({
     items: [
       {
@@ -286,7 +287,7 @@ export const multiCommunicationBenchmark = {
       },
       {
         section: "coming_up",
-        title: "Sam's Year 6 museum trip",
+        title: "Year 6 Science Museum trip",
         childIds: [samId],
       },
       {
@@ -334,3 +335,15 @@ export const multiCommunicationBenchmark = {
     ],
   }),
 };
+
+export async function createMultiCommunicationBenchmark() {
+  const extractions = await extractCorpus(demoCorpus, createRecordedCorpusExtractor(demoCorpus));
+
+  return {
+    ...multiCommunicationBenchmark,
+    scenario: {
+      household: demoHousehold,
+      extractions,
+    },
+  };
+}

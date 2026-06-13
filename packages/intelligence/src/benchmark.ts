@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { validatedExtractionSchema } from "./contracts";
-import { digestSchema, householdDigestConfigSchema } from "./digest";
+import { digestSchema, householdDigestConfigSchema, reconciliationSchema } from "./digest";
 import { createDigestWorkflow } from "./digest-workflow";
 
 const expectedDigestItemSchema = z
@@ -24,7 +24,6 @@ const digestBenchmarkInputSchema = z
       household: householdDigestConfigSchema,
       extractions: z.array(validatedExtractionSchema).min(1),
     }),
-    pipelineReconciliation: z.unknown(),
     expected: digestGroundTruthSchema,
     naive: digestSchema,
   })
@@ -94,10 +93,16 @@ export function scoreDigest(expectedInput: unknown, actualInput: unknown) {
   };
 }
 
-export async function runDigestBenchmark(input: unknown) {
+export async function runDigestBenchmark(
+  input: unknown,
+  reconcile: (input: {
+    household: z.infer<typeof householdDigestConfigSchema>;
+    extractions: z.infer<typeof validatedExtractionSchema>[];
+  }) => Promise<unknown>,
+) {
   const benchmark = digestBenchmarkInputSchema.parse(input);
   const workflow = createDigestWorkflow({
-    reconcile: async () => benchmark.pipelineReconciliation,
+    reconcile: async (scenario) => reconciliationSchema.parse(await reconcile(scenario)),
   });
   const result = await workflow.invoke(benchmark.scenario);
   if (!result.digest) {

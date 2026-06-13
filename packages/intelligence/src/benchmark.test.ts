@@ -1,10 +1,14 @@
 import { expect, test } from "vite-plus/test";
 
 import { runDigestBenchmark } from "./benchmark";
-import { multiCommunicationBenchmark } from "./scenario";
+import { reconcileDigest } from "./reconcile";
+import { createMultiCommunicationBenchmark } from "./scenario";
 
 test("the staged pipeline beats the naive baseline on the multi-communication scenario", async () => {
-  const result = await runDigestBenchmark(multiCommunicationBenchmark);
+  const result = await runDigestBenchmark(
+    await createMultiCommunicationBenchmark(),
+    async (input) => reconcileDigest(input),
+  );
 
   expect(result.pipeline).toMatchObject({
     precision: 1,

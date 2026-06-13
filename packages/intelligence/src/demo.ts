@@ -1,13 +1,16 @@
+import { createRecordedCorpusExtractor, extractCorpus } from "./corpus-pipeline";
+import { demoCorpus, demoHousehold } from "./demo-corpus";
 import { createDigestWorkflow } from "./digest-workflow";
-import { multiCommunicationScenario } from "./scenario";
+import { reconcileDigest } from "./reconcile";
 
 export async function createDemoDigest(options: { completedResponsibilityIds?: string[] } = {}) {
+  const extractions = await extractCorpus(demoCorpus, createRecordedCorpusExtractor(demoCorpus));
   const workflow = createDigestWorkflow({
-    reconcile: async () => multiCommunicationScenario.reconciliation,
+    reconcile: async (input) => reconcileDigest(input),
   });
   const result = await workflow.invoke({
-    household: multiCommunicationScenario.household,
-    extractions: multiCommunicationScenario.extractions,
+    household: demoHousehold,
+    extractions,
   });
 
   if (!result.digest) {
@@ -23,20 +26,21 @@ export async function createDemoDigest(options: { completedResponsibilityIds?: s
 
   return {
     asOf: "2026-01-16",
-    household: multiCommunicationScenario.household,
+    household: demoHousehold,
     digest: {
       ...result.digest,
       actNow: result.digest.actNow.filter((item) => !completed.includes(item)),
     },
     completed,
-    communications: multiCommunicationScenario.extractions
+    communications: extractions
       .map(({ communication }) => communication)
       .sort((left, right) => left.receivedAt.localeCompare(right.receivedAt)),
   };
 }
 
-export function isDemoResponsibilityId(responsibilityId: string) {
-  return multiCommunicationScenario.extractions.some(({ responsibilities }) =>
+export async function isDemoResponsibilityId(responsibilityId: string) {
+  const extractions = await extractCorpus(demoCorpus, createRecordedCorpusExtractor(demoCorpus));
+  return extractions.some(({ responsibilities }) =>
     responsibilities.some(({ id }) => id === responsibilityId),
   );
 }
