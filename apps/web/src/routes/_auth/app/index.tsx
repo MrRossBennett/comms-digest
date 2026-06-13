@@ -1,6 +1,6 @@
 import { Button } from "@repo/ui/components/button";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
-import { BookOpenIcon, PencilIcon, SchoolIcon, SparklesIcon } from "lucide-react";
+import { MailIcon, PencilIcon, SchoolIcon, SparklesIcon } from "lucide-react";
 
 import { $getHousehold } from "#/lib/household.functions";
 
@@ -82,7 +82,7 @@ function HouseholdHome() {
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
             <div className="rounded-full bg-muted p-2 text-muted-foreground">
-              <BookOpenIcon className="size-4" />
+              <MailIcon className="size-4" />
             </div>
             <div>
               <h2 id="communications-heading" className="font-semibold tracking-tight">
@@ -93,10 +93,16 @@ function HouseholdHome() {
               </p>
             </div>
           </div>
-          <Button variant="outline" render={<Link to="/app/demo" />}>
-            <SparklesIcon />
-            View Demo Digest
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button render={<Link to="/app/sources" />}>
+              <MailIcon />
+              Review Sources
+            </Button>
+            <Button variant="outline" render={<Link to="/app/demo" />}>
+              <SparklesIcon />
+              View Demo Digest
+            </Button>
+          </div>
         </div>
       </section>
     </main>

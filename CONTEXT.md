@@ -31,10 +31,12 @@ _Avoid_: Correspondence, content, document
 
 **Communication Source**:
 A sender or recurring origin of **School Communications**, such as a school office, teacher, club, or school messaging service. A confirmed **Communication Source** may be relevant to one or more **Children** or the whole **Household**.
+Discovery stores sender identity, message count, and most recent date only. Message subjects and bodies are not persisted during discovery.
 _Avoid_: Sender rule, Gmail filter, contact
 
 **Source Review**:
 The onboarding step in which the **Household Owner** confirms, rejects, and assigns discovered **Communication Sources** before the first **Digest** is produced.
+Gmail permission is requested separately from sign-in and is read-only. A confirmed **Communication Source** applies to the whole **Household**, one **School**, or selected **Children** at one **School**.
 _Avoid_: Inbox setup, sender configuration
 
 **Digest**:
