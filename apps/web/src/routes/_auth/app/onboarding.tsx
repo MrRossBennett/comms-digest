@@ -18,15 +18,32 @@ function HouseholdOnboarding() {
   const existingHousehold = Route.useLoaderData();
   const navigate = useNavigate();
   const router = useRouter();
-  const [schoolName, setSchoolName] = useState(existingHousehold?.schools[0]?.name ?? "");
+  const [householdSchools, setHouseholdSchools] = useState(() =>
+    existingHousehold?.schools.length
+      ? existingHousehold.schools.map((householdSchool) => ({
+          key: householdSchool.id,
+          name: householdSchool.name,
+        }))
+      : [{ key: "school-1", name: "" }],
+  );
   const [householdChildren, setHouseholdChildren] = useState(() =>
     existingHousehold?.children.length
       ? existingHousehold.children.map((householdChild) => ({
+          key: householdChild.id,
           displayName: householdChild.displayName,
           schoolYear: householdChild.schoolYear,
           className: householdChild.className ?? "",
+          schoolKey: householdChild.schoolId,
         }))
-      : [{ displayName: "", schoolYear: "", className: "" }],
+      : [
+          {
+            key: "child-1",
+            displayName: "",
+            schoolYear: "",
+            className: "",
+            schoolKey: "school-1",
+          },
+        ],
   );
   const saveMutation = useMutation({
     mutationFn: $saveHousehold,
@@ -41,7 +58,7 @@ function HouseholdOnboarding() {
 
   const updateChild = (
     index: number,
-    field: "displayName" | "schoolYear" | "className",
+    field: "displayName" | "schoolYear" | "className" | "schoolKey",
     value: string,
   ) => {
     setHouseholdChildren((current) =>
@@ -57,7 +74,7 @@ function HouseholdOnboarding() {
 
     saveMutation.mutate({
       data: {
-        schoolName,
+        schools: householdSchools,
         children: householdChildren,
       },
     });
@@ -86,18 +103,84 @@ function HouseholdOnboarding() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
-        <section className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
-          <div className="grid gap-2">
-            <Label htmlFor="school-name">School</Label>
-            <Input
-              id="school-name"
-              value={schoolName}
-              onChange={(event) => setSchoolName(event.target.value)}
-              placeholder="Riverside Primary"
-              autoComplete="organization"
-              readOnly={saveMutation.isPending}
-              required
-            />
+        <section aria-labelledby="household-schools-heading">
+          <div className="mb-3 flex items-end justify-between gap-4">
+            <div>
+              <h2 id="household-schools-heading" className="font-semibold tracking-tight">
+                Schools
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Add every School attended by a Child in this Household.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={saveMutation.isPending}
+              onClick={() =>
+                setHouseholdSchools((current) => [
+                  ...current,
+                  { key: `school-${Date.now()}`, name: "" },
+                ])
+              }
+            >
+              <PlusIcon />
+              Add School
+            </Button>
+          </div>
+
+          <div className="grid gap-4">
+            {householdSchools.map((householdSchool, index) => {
+              const hasAssignedChildren = householdChildren.some(
+                ({ schoolKey }) => schoolKey === householdSchool.key,
+              );
+
+              return (
+                <fieldset
+                  key={householdSchool.key}
+                  className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6"
+                  disabled={saveMutation.isPending}
+                >
+                  <legend className="sr-only">School {index + 1}</legend>
+                  <div className="flex items-end gap-3">
+                    <div className="grid flex-1 gap-2">
+                      <Label htmlFor={`school-${index}-name`}>School name</Label>
+                      <Input
+                        id={`school-${index}-name`}
+                        value={householdSchool.name}
+                        onChange={(event) =>
+                          setHouseholdSchools((current) =>
+                            current.map((candidate) =>
+                              candidate.key === householdSchool.key
+                                ? { ...candidate, name: event.target.value }
+                                : candidate,
+                            ),
+                          )
+                        }
+                        placeholder="Riverside Primary"
+                        autoComplete="organization"
+                        required
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Remove School ${index + 1}`}
+                      disabled={householdSchools.length === 1 || hasAssignedChildren}
+                      onClick={() =>
+                        setHouseholdSchools((current) =>
+                          current.filter(({ key }) => key !== householdSchool.key),
+                        )
+                      }
+                    >
+                      <Trash2Icon />
+                    </Button>
+                  </div>
+                </fieldset>
+              );
+            })}
           </div>
         </section>
 
@@ -119,7 +202,13 @@ function HouseholdOnboarding() {
               onClick={() =>
                 setHouseholdChildren((current) => [
                   ...current,
-                  { displayName: "", schoolYear: "", className: "" },
+                  {
+                    key: `child-${Date.now()}`,
+                    displayName: "",
+                    schoolYear: "",
+                    className: "",
+                    schoolKey: householdSchools[0]?.key ?? "",
+                  },
                 ])
               }
             >
@@ -131,12 +220,12 @@ function HouseholdOnboarding() {
           <div className="grid gap-4">
             {householdChildren.map((householdChild, index) => (
               <fieldset
-                key={index}
+                key={householdChild.key}
                 className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6"
                 disabled={saveMutation.isPending}
               >
                 <legend className="sr-only">Child {index + 1}</legend>
-                <div className="grid gap-4 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end">
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div className="grid gap-2">
                     <Label htmlFor={`child-${index}-name`}>Name</Label>
                     <Input
@@ -147,6 +236,22 @@ function HouseholdOnboarding() {
                       autoComplete="off"
                       required
                     />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor={`child-${index}-school`}>School</Label>
+                    <select
+                      id={`child-${index}-school`}
+                      value={householdChild.schoolKey}
+                      onChange={(event) => updateChild(index, "schoolKey", event.target.value)}
+                      className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+                      required
+                    >
+                      {householdSchools.map((householdSchool) => (
+                        <option key={householdSchool.key} value={householdSchool.key}>
+                          {householdSchool.name || "Unnamed School"}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor={`child-${index}-year`}>School year</Label>
@@ -169,20 +274,22 @@ function HouseholdOnboarding() {
                       autoComplete="off"
                     />
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Remove Child ${index + 1}`}
-                    disabled={householdChildren.length === 1}
-                    onClick={() =>
-                      setHouseholdChildren((current) =>
-                        current.filter((_, childIndex) => childIndex !== index),
-                      )
-                    }
-                  >
-                    <Trash2Icon />
-                  </Button>
+                  <div className="flex justify-end sm:col-span-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={householdChildren.length === 1}
+                      onClick={() =>
+                        setHouseholdChildren((current) =>
+                          current.filter((_, childIndex) => childIndex !== index),
+                        )
+                      }
+                    >
+                      <Trash2Icon />
+                      Remove Child
+                    </Button>
+                  </div>
                 </div>
               </fieldset>
             ))}

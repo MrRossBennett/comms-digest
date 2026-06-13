@@ -1,6 +1,6 @@
 import { Button } from "@repo/ui/components/button";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
-import { BookOpenIcon, GraduationCapIcon, PencilIcon, SparklesIcon } from "lucide-react";
+import { BookOpenIcon, PencilIcon, SchoolIcon, SparklesIcon } from "lucide-react";
 
 import { $getHousehold } from "#/lib/household.functions";
 
@@ -17,7 +17,6 @@ export const Route = createFileRoute("/_auth/app/")({
 
 function HouseholdHome() {
   const household = Route.useLoaderData();
-  const primarySchool = household.schools[0];
 
   return (
     <main className="mx-auto w-full max-w-5xl px-5 py-10 sm:px-8 sm:py-14">
@@ -25,10 +24,10 @@ function HouseholdHome() {
         <div className="space-y-2">
           <p className="text-sm font-medium text-muted-foreground">Your Household</p>
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-            {primarySchool?.name ?? "School communications"}
+            Schools and Children
           </h1>
           <p className="max-w-xl text-sm leading-6 text-muted-foreground">
-            Your Household is ready. Connecting School Communications comes next.
+            One combined Household Digest across {formatSchoolCount(household.schools.length)}.
           </p>
         </div>
         <Button variant="outline" render={<Link to="/app/onboarding" />}>
@@ -37,28 +36,40 @@ function HouseholdHome() {
         </Button>
       </div>
 
-      <section aria-labelledby="children-heading">
+      <section aria-labelledby="schools-heading">
         <div className="mb-3 flex items-center gap-3">
-          <GraduationCapIcon className="size-5 text-muted-foreground" />
+          <SchoolIcon className="size-5 text-muted-foreground" />
           <div>
-            <h2 id="children-heading" className="font-semibold tracking-tight">
-              Children
+            <h2 id="schools-heading" className="font-semibold tracking-tight">
+              Schools
             </h2>
             <p className="text-sm text-muted-foreground">
-              Used only to match relevant year, class, and named communications.
+              Each Child is matched only against communications from their School.
             </p>
           </div>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          {household.children.map((householdChild) => (
+          {household.schools.map((householdSchool) => (
             <article
-              key={householdChild.id}
+              key={householdSchool.id}
               className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6"
             >
-              <h3 className="font-semibold tracking-tight">{householdChild.displayName}</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {[householdChild.schoolYear, householdChild.className].filter(Boolean).join(" · ")}
-              </p>
+              <h3 className="font-semibold tracking-tight">{householdSchool.name}</h3>
+              <ul className="mt-3 space-y-2">
+                {household.children
+                  .filter(({ schoolId }) => schoolId === householdSchool.id)
+                  .map((householdChild) => (
+                    <li key={householdChild.id} className="text-sm text-muted-foreground">
+                      <span className="font-medium text-foreground">
+                        {householdChild.displayName}
+                      </span>
+                      {" · "}
+                      {[householdChild.schoolYear, householdChild.className]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </li>
+                  ))}
+              </ul>
             </article>
           ))}
         </div>
@@ -90,4 +101,8 @@ function HouseholdHome() {
       </section>
     </main>
   );
+}
+
+function formatSchoolCount(count: number) {
+  return `${count} ${count === 1 ? "School" : "Schools"}`;
 }
