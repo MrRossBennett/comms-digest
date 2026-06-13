@@ -11,8 +11,8 @@ import {
   DropdownMenuTrigger,
 } from "@repo/ui/components/dropdown-menu";
 import { useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, Outlet, useRouter } from "@tanstack/react-router";
-import { LogOutIcon, UserIcon } from "lucide-react";
+import { createFileRoute, Link, Outlet, useRouter } from "@tanstack/react-router";
+import { HomeIcon, LogOutIcon, SparklesIcon, UserIcon } from "lucide-react";
 
 import { ThemeToggle } from "#/components/theme-toggle";
 
@@ -29,9 +29,18 @@ function AppLayout() {
         <div className="mx-auto flex h-16 w-full max-w-5xl items-center justify-between px-5 sm:px-8">
           <div>
             <p className="font-semibold tracking-tight">Comms Digest</p>
-            <p className="text-xs text-muted-foreground">Demo Household</p>
           </div>
           <div className="flex items-center gap-2">
+            <nav className="hidden items-center gap-1 sm:flex" aria-label="Main navigation">
+              <Button variant="ghost" size="sm" render={<Link to="/app" />}>
+                <HomeIcon />
+                Household
+              </Button>
+              <Button variant="ghost" size="sm" render={<Link to="/app/demo" />}>
+                <SparklesIcon />
+                Demo
+              </Button>
+            </nav>
             <ThemeToggle />
             <AccountMenu name={user.name} email={user.email} />
           </div>

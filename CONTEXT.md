@@ -18,6 +18,7 @@ _Avoid_: Default household, sample account
 
 **Child**:
 A young person in a **Household** whose **School** and school year help determine which communications are relevant.
+The first version stores only a display name chosen by the **Household Owner**, school year, optional class, and **School**. A first name or nickname is sufficient; surnames, dates of birth, gender, and other identifiers are not collected.
 _Avoid_: Student, pupil, dependent
 
 **School**:
