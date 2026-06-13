@@ -1,0 +1,29 @@
+import { index, pgEnum, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
+
+import { user } from "./auth.schema";
+
+export const responsibilityStatusValue = pgEnum("responsibility_status_value", [
+  "unresolved",
+  "completed",
+  "dismissed",
+  "superseded",
+]);
+
+export const responsibilityStatus = pgTable(
+  "responsibility_status",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    responsibilityId: text("responsibility_id").notNull(),
+    status: responsibilityStatusValue("status").notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.responsibilityId] }),
+    index("responsibility_status_user_id_idx").on(table.userId),
+  ],
+);

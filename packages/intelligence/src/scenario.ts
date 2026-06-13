@@ -20,6 +20,12 @@ const cancellationCitationId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c0e";
 const year6Id = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c0f";
 const year6ClaimId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c10";
 const year6CitationId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c11";
+const museumTripId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c13";
+const museumTripClaimId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c14";
+const museumTripCitationId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c15";
+const permissionFormClaimId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c16";
+const permissionFormCitationId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c17";
+const permissionFormResponsibilityId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c18";
 
 function citation(communicationId: string, id: string, sourceText: string, quote: string) {
   const start = sourceText.indexOf(quote);
@@ -47,6 +53,10 @@ const cancellationText = "Year 4 swimming on Monday 19 January has been cancelle
 const cancellationQuote = cancellationText;
 const year6Text = "Year 6 disco tickets are now available.";
 const year6Quote = year6Text;
+const museumTripText =
+  "Year 6 visit the Science Museum on Tuesday 27 January. Please return Sam's signed permission form by Friday 23 January.";
+const museumTripQuote = "Year 6 visit the Science Museum on Tuesday 27 January.";
+const permissionFormQuote = "Please return Sam's signed permission form by Friday 23 January.";
 
 const extractions = [
   validatedExtractionSchema.parse({
@@ -159,6 +169,42 @@ const extractions = [
     ],
     responsibilities: [],
   }),
+  validatedExtractionSchema.parse({
+    communication: communication(
+      museumTripId,
+      "2026-01-16T16:00:00.000Z",
+      "Year 6 Science Museum trip",
+      museumTripText,
+    ),
+    claims: [
+      {
+        id: museumTripClaimId,
+        content: "Year 6 will visit the Science Museum on 27 January 2026.",
+        audience: { scope: "group", originalWording: "Year 6" },
+        certainty: "confirmed",
+        date: { originalWording: "Tuesday 27 January", resolvedDate: "2026-01-27" },
+        citations: [citation(museumTripId, museumTripCitationId, museumTripText, museumTripQuote)],
+      },
+      {
+        id: permissionFormClaimId,
+        content: "Sam's signed museum trip permission form is due by 23 January 2026.",
+        audience: { scope: "child", originalWording: "Sam" },
+        certainty: "confirmed",
+        date: { originalWording: "Friday 23 January", resolvedDate: "2026-01-23" },
+        citations: [
+          citation(museumTripId, permissionFormCitationId, museumTripText, permissionFormQuote),
+        ],
+      },
+    ],
+    responsibilities: [
+      {
+        id: permissionFormResponsibilityId,
+        title: "Return Sam's museum trip permission form",
+        dueDate: { originalWording: "Friday 23 January", resolvedDate: "2026-01-23" },
+        supportingClaimIds: [permissionFormClaimId],
+      },
+    ],
+  }),
 ];
 
 export const multiCommunicationScenario = {
@@ -171,6 +217,18 @@ export const multiCommunicationScenario = {
   extractions,
   reconciliation: reconciliationSchema.parse({
     items: [
+      {
+        section: "act_now",
+        title: "Return Sam's museum trip permission form",
+        claimIds: [permissionFormClaimId],
+        responsibilityIds: [permissionFormResponsibilityId],
+      },
+      {
+        section: "coming_up",
+        title: "Sam's Year 6 museum trip",
+        claimIds: [museumTripClaimId],
+        responsibilityIds: [],
+      },
       {
         section: "good_to_know",
         title: "Year 4 swimming has been cancelled",
@@ -221,6 +279,16 @@ export const multiCommunicationBenchmark = {
   pipelineReconciliation: multiCommunicationScenario.reconciliation,
   expected: digestGroundTruthSchema.parse({
     items: [
+      {
+        section: "act_now",
+        title: "Return Sam's museum trip permission form",
+        childIds: [samId],
+      },
+      {
+        section: "coming_up",
+        title: "Sam's Year 6 museum trip",
+        childIds: [samId],
+      },
       {
         section: "good_to_know",
         title: "Year 4 swimming has been cancelled",

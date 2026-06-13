@@ -6,8 +6,16 @@ import { multiCommunicationScenario } from "./scenario";
 test("reconciles several School Communications into one household-specific Digest", () => {
   const digest = composeDigest(multiCommunicationScenario);
 
-  expect(digest.actNow).toEqual([]);
-  expect(digest.comingUp).toEqual([]);
+  expect(digest.actNow).toHaveLength(1);
+  expect(digest.actNow[0]).toMatchObject({
+    title: "Return Sam's museum trip permission form",
+    childIds: ["018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c12"],
+  });
+  expect(digest.comingUp).toHaveLength(1);
+  expect(digest.comingUp[0]).toMatchObject({
+    title: "Sam's Year 6 museum trip",
+    childIds: ["018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c12"],
+  });
   expect(digest.goodToKnow).toHaveLength(2);
   expect(digest.goodToKnow[0]).toMatchObject({
     title: "Year 4 swimming has been cancelled",
