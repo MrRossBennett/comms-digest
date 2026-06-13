@@ -1,4 +1,4 @@
-import type { SchoolCommunication, ValidatedExtraction } from "@repo/intelligence";
+import type { Digest, SchoolCommunication, ValidatedExtraction } from "@repo/intelligence";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   CalendarDaysIcon,
@@ -18,8 +18,6 @@ export const Route = createFileRoute("/_auth/app/")({
 
 function AppIndex() {
   const demo = Route.useLoaderData();
-  const child = demo.household.children[0];
-  const cancellation = demo.digest.goodToKnow[0];
 
   return (
     <main className="mx-auto w-full max-w-5xl px-5 py-10 sm:px-8 sm:py-14">
@@ -31,11 +29,13 @@ function AppIndex() {
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
             What matters from school
           </h1>
-          {child ? (
-            <p className="text-sm text-muted-foreground">
-              {child.name} · {child.schoolYear}
-            </p>
-          ) : null}
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+            {demo.household.children.map((child) => (
+              <span key={child.id}>
+                {child.name} · {child.schoolYear}
+              </span>
+            ))}
+          </div>
         </div>
         <p className="max-w-sm text-sm leading-6 text-muted-foreground">
           A synthetic example showing how later School Communications update what your Household
@@ -61,42 +61,72 @@ function AppIndex() {
           description="Useful updates that do not need action."
           icon={<InfoIcon />}
         >
-          {cancellation ? (
-            <article className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-              <div className="p-5 sm:p-6">
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5 rounded-full bg-muted p-2 text-muted-foreground">
-                    <InfoIcon className="size-4" />
-                  </div>
-                  <div className="min-w-0 space-y-2">
-                    <h3 className="font-semibold tracking-tight">{cancellation.title}</h3>
-                    <p className="text-sm leading-6 text-muted-foreground">
-                      The payment Responsibility is no longer outstanding.
-                    </p>
-                    {child ? (
-                      <p className="text-xs font-medium text-muted-foreground">
-                        Applies to {child.name}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-
-              <details className="group border-t">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-medium hover:bg-muted/50 sm:px-6 [&::-webkit-details-marker]:hidden">
-                  <span className="flex items-center gap-2">
-                    <FileTextIcon className="size-4 text-muted-foreground" />
-                    View sources
-                  </span>
-                  <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-open:rotate-180" />
-                </summary>
-                <EvidenceTrail communications={demo.communications} claims={cancellation.claims} />
-              </details>
-            </article>
-          ) : null}
+          <div className="grid gap-3">
+            {demo.digest.goodToKnow.map((item) => (
+              <DigestItem
+                key={item.title}
+                item={item}
+                householdChildren={demo.household.children}
+                communications={demo.communications}
+              />
+            ))}
+          </div>
         </DigestSection>
       </div>
     </main>
+  );
+}
+
+function DigestItem({
+  item,
+  householdChildren,
+  communications,
+}: {
+  item: Digest["goodToKnow"][number];
+  householdChildren: Array<{ id: string; name: string; schoolYear: string }>;
+  communications: SchoolCommunication[];
+}) {
+  const childNames = householdChildren
+    .filter((child) => item.childIds.includes(child.id))
+    .map((child) => child.name);
+  const supersedesResponsibilities = item.responsibilities.length > 0;
+
+  return (
+    <article className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+      <div className="p-5 sm:p-6">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 rounded-full bg-muted p-2 text-muted-foreground">
+            <InfoIcon className="size-4" />
+          </div>
+          <div className="min-w-0 space-y-2">
+            <h3 className="font-semibold tracking-tight">{item.title}</h3>
+            {supersedesResponsibilities ? (
+              <p className="text-sm leading-6 text-muted-foreground">
+                The payment Responsibility is no longer outstanding.
+              </p>
+            ) : null}
+            <p className="text-xs font-medium text-muted-foreground">
+              Applies to {formatNames(childNames)}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <details className="group border-t">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-medium hover:bg-muted/50 sm:px-6 [&::-webkit-details-marker]:hidden">
+          <span className="flex items-center gap-2">
+            <FileTextIcon className="size-4 text-muted-foreground" />
+            View sources
+          </span>
+          <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-open:rotate-180" />
+        </summary>
+        <EvidenceTrail
+          communications={communications}
+          claims={item.claims}
+          supersedesResponsibilities={supersedesResponsibilities}
+        />
+      </details>
+    </article>
   );
 }
 
@@ -139,9 +169,11 @@ function DigestSection({
 function EvidenceTrail({
   communications,
   claims,
+  supersedesResponsibilities,
 }: {
   communications: SchoolCommunication[];
   claims: ValidatedExtraction["claims"];
+  supersedesResponsibilities: boolean;
 }) {
   const evidence = communications.flatMap((communication) => {
     const citations = claims.flatMap((claim) =>
@@ -152,13 +184,17 @@ function EvidenceTrail({
 
   return (
     <div className="space-y-6 bg-muted/30 px-5 py-6 sm:px-6">
-      <div>
-        <h4 className="font-medium">How this changed</h4>
-        <p className="mt-1 text-sm leading-6 text-muted-foreground">
-          The later cancellation supersedes the earlier swimming activity and its unresolved payment
-          Responsibility.
-        </p>
-      </div>
+      {supersedesResponsibilities ? (
+        <div>
+          <h4 className="font-medium">How this changed</h4>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+            The later cancellation supersedes the earlier swimming activity and its unresolved
+            payment Responsibility.
+          </p>
+        </div>
+      ) : (
+        <h4 className="font-medium">Supporting School Communication</h4>
+      )}
       <ol className="space-y-5">
         {evidence.map(({ communication, citations }, index) => (
           <li key={communication.id} className="relative pl-7">
@@ -224,6 +260,11 @@ function HighlightedSource({
       )}
     </Fragment>
   ));
+}
+
+function formatNames(names: string[]) {
+  if (names.length <= 1) return names[0] ?? "this Household";
+  return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 }
 
 function formatDate(value: string) {

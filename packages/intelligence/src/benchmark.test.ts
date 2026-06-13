@@ -14,12 +14,12 @@ test("the staged pipeline beats the naive baseline on the multi-communication sc
     hallucinationRate: 0,
   });
   expect(result.naive).toMatchObject({
-    precision: 0,
-    recall: 0,
+    precision: 0.25,
+    recall: 0.5,
     routingAccuracy: 0,
     citationCoverage: 1,
-    hallucinationRate: 1,
-    overall: 0.25,
+    hallucinationRate: 0.75,
+    overall: 0.4375,
   });
-  expect(result.delta).toBe(0.75);
+  expect(result.delta).toBe(0.5625);
 });

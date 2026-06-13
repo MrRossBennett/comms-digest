@@ -8,10 +8,14 @@ test("reconciles several School Communications into one household-specific Diges
 
   expect(digest.actNow).toEqual([]);
   expect(digest.comingUp).toEqual([]);
-  expect(digest.goodToKnow).toHaveLength(1);
+  expect(digest.goodToKnow).toHaveLength(2);
   expect(digest.goodToKnow[0]).toMatchObject({
     title: "Year 4 swimming has been cancelled",
     childIds: ["018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c01"],
+  });
+  expect(digest.goodToKnow[1]).toMatchObject({
+    title: "Year 6 disco tickets are available",
+    childIds: ["018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c12"],
   });
   expect(digest.goodToKnow[0]?.claims).toHaveLength(4);
   expect(digest.goodToKnow[0]?.responsibilities).toHaveLength(2);
@@ -20,7 +24,7 @@ test("reconciles several School Communications into one household-specific Diges
     (item) => item.claims,
   );
   expect(surfacedClaims.every((claim) => claim.citations.length > 0)).toBe(true);
-  expect(surfacedClaims.some((claim) => claim.audience.originalWording === "Year 6")).toBe(false);
+  expect(surfacedClaims.some((claim) => claim.audience.originalWording === "Year 6")).toBe(true);
 });
 
 test("fails closed when reconciliation references an unknown Claim", () => {

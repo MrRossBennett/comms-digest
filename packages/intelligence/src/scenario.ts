@@ -2,7 +2,8 @@ import { digestGroundTruthSchema } from "./benchmark";
 import { schoolCommunicationSchema, validatedExtractionSchema } from "./contracts";
 import { digestSchema, householdDigestConfigSchema, reconciliationSchema } from "./digest";
 
-const childId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c01";
+const alexId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c01";
+const samId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c12";
 const announcementId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c02";
 const announcementEventClaimId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c03";
 const announcementEventCitationId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c04";
@@ -162,7 +163,10 @@ const extractions = [
 
 export const multiCommunicationScenario = {
   household: householdDigestConfigSchema.parse({
-    children: [{ id: childId, name: "Alex", schoolYear: "Year 4" }],
+    children: [
+      { id: alexId, name: "Alex", schoolYear: "Year 4" },
+      { id: samId, name: "Sam", schoolYear: "Year 6" },
+    ],
   }),
   extractions,
   reconciliation: reconciliationSchema.parse({
@@ -220,7 +224,12 @@ export const multiCommunicationBenchmark = {
       {
         section: "good_to_know",
         title: "Year 4 swimming has been cancelled",
-        childIds: [childId],
+        childIds: [alexId],
+      },
+      {
+        section: "good_to_know",
+        title: "Year 6 disco tickets are available",
+        childIds: [samId],
       },
     ],
   }),
@@ -228,13 +237,13 @@ export const multiCommunicationBenchmark = {
     actNow: [
       {
         title: "Pay £12 for Year 4 swimming",
-        childIds: [childId],
+        childIds: [alexId],
         claims: [requireClaim(announcementPaymentClaimId)],
         responsibilities: [requireResponsibility(announcementResponsibilityId)],
       },
       {
         title: "Remember to pay for swimming",
-        childIds: [childId],
+        childIds: [alexId],
         claims: [requireClaim(reminderClaimId)],
         responsibilities: [requireResponsibility(reminderResponsibilityId)],
       },
@@ -242,7 +251,7 @@ export const multiCommunicationBenchmark = {
     comingUp: [
       {
         title: "Year 4 swimming starts on 19 January",
-        childIds: [childId],
+        childIds: [alexId],
         claims: [requireClaim(announcementEventClaimId)],
         responsibilities: [],
       },
@@ -250,7 +259,7 @@ export const multiCommunicationBenchmark = {
     goodToKnow: [
       {
         title: "Year 6 disco tickets are available",
-        childIds: [childId],
+        childIds: [alexId],
         claims: [requireClaim(year6ClaimId)],
         responsibilities: [],
       },
