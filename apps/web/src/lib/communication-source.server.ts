@@ -16,6 +16,7 @@ import {
   hasGmailReadonlyScope,
   parseSender,
 } from "./communication-source";
+import { gmailRequest } from "./gmail";
 import { getHouseholdForOwner } from "./household.server";
 
 const gmailMessageListSchema = z.object({
@@ -150,16 +151,17 @@ export async function scanGmailSourcesForOwner(ownerUserId: string) {
     ),
   );
 
-  const metadata = await Promise.all(
-    (messageList.messages ?? []).map(async ({ id }) =>
+  const metadata = [];
+  for (const { id } of messageList.messages ?? []) {
+    metadata.push(
       gmailMessageMetadataSchema.parse(
         await gmailRequest(
           `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=From`,
           accessToken,
         ),
       ),
-    ),
-  );
+    );
+  }
 
   const senders = new Map<
     string,
@@ -258,7 +260,7 @@ export async function saveCommunicationSourceReviewForOwner(ownerUserId: string,
         selectedChildren.length !== review.childIds.length ||
         selectedChildren.some(({ schoolId }) => schoolId !== review.schoolId)
       ) {
-        throw new Error("Every selected Child must belong to the selected School");
+        throw new Error("Every selected Student must belong to the selected School");
       }
     }
 
@@ -290,18 +292,4 @@ export async function saveCommunicationSourceReviewForOwner(ownerUserId: string,
   });
 
   return getSourceReviewForOwner(ownerUserId);
-}
-
-async function gmailRequest(url: string, accessToken: string) {
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Gmail scan failed with status ${response.status}`);
-  }
-
-  return response.json();
 }

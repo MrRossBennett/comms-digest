@@ -28,7 +28,9 @@ import { createLiveExtractor } from "@repo/intelligence/live";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
+import { gmailRequest } from "./gmail";
 import { getHouseholdForOwner } from "./household.server";
+import { limitGmailSourceText, selectNewGmailMessages } from "./ingestion-limits";
 import { listCompletedResponsibilityIds } from "./responsibility-status.server";
 
 const gmailMessageListSchema = z.object({
@@ -81,7 +83,9 @@ export async function fetchNewCommunicationsForOwner(ownerUserId: string) {
     .map((source) => createSampleCandidate(source, householdSetup.children));
   const gmailSources = sources.filter(({ discovery }) => discovery === "gmail");
   const gmailCandidates =
-    gmailSources.length > 0 ? await fetchGmailCandidates(ownerUserId, gmailSources) : [];
+    gmailSources.length > 0
+      ? await fetchGmailCandidates(ownerUserId, householdSetup.id, gmailSources)
+      : [];
   const candidates = [...sampleCandidates, ...gmailCandidates];
   const existingExternalIds =
     candidates.length === 0
@@ -210,7 +214,7 @@ function createSampleCandidate(
 
   if (source.audience === "children" && source.childIds.length > 0) {
     const name =
-      householdChildren.find(({ id }) => id === source.childIds[0])?.displayName ?? "Your child";
+      householdChildren.find(({ id }) => id === source.childIds[0])?.displayName ?? "Your student";
     const sourceText = `${name}'s museum visit is on Wednesday 24 June. Please return the signed permission form by Friday 19 June.`;
     const eventQuote = `${name}'s museum visit is on Wednesday 24 June.`;
     const responsibilityQuote = "Please return the signed permission form by Friday 19 June.";
@@ -292,7 +296,11 @@ function citationFor(sourceText: string, quote: string) {
   return { quote, start, end: start + quote.length };
 }
 
-async function fetchGmailCandidates(ownerUserId: string, sources: ConfirmedSource[]) {
+async function fetchGmailCandidates(
+  ownerUserId: string,
+  householdId: string,
+  sources: ConfirmedSource[],
+) {
   const [googleAccount] = await db
     .select({ scope: account.scope })
     .from(account)
@@ -306,7 +314,7 @@ async function fetchGmailCandidates(ownerUserId: string, sources: ConfirmedSourc
   const { accessToken } = await auth.api.getAccessToken({
     body: { providerId: "google", userId: ownerUserId },
   });
-  const candidates: IngestionCandidate[] = [];
+  const listedMessages: Array<{ id: string; source: ConfirmedSource }> = [];
 
   for (const source of sources) {
     const list = gmailMessageListSchema.parse(
@@ -315,28 +323,50 @@ async function fetchGmailCandidates(ownerUserId: string, sources: ConfirmedSourc
         accessToken,
       ),
     );
+    listedMessages.push(...(list.messages ?? []).map(({ id }) => ({ id, source })));
+  }
 
-    for (const { id } of list.messages ?? []) {
-      const message = gmailMessageSchema.parse(
-        await gmailRequest(
-          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
-          accessToken,
-        ),
-      );
-      const subject =
-        message.payload.headers?.find(({ name }) => name.toLocaleLowerCase("en-GB") === "subject")
-          ?.value ?? "School communication";
-      const sourceText = extractGmailText(message.payload);
-      if (!sourceText) continue;
+  const existingExternalIds =
+    listedMessages.length === 0
+      ? []
+      : await db
+          .select({ externalMessageId: schoolCommunication.externalMessageId })
+          .from(schoolCommunication)
+          .where(
+            and(
+              eq(schoolCommunication.householdId, householdId),
+              inArray(
+                schoolCommunication.externalMessageId,
+                listedMessages.map(({ id }) => id),
+              ),
+            ),
+          );
+  const messagesToFetch = selectNewGmailMessages(
+    listedMessages,
+    new Set(existingExternalIds.map(({ externalMessageId }) => externalMessageId)),
+  );
+  const candidates: IngestionCandidate[] = [];
 
-      candidates.push({
-        source,
-        externalMessageId: message.id,
-        receivedAt: new Date(Number(message.internalDate)).toISOString(),
-        subject,
-        sourceText,
-      });
-    }
+  for (const { id, source } of messagesToFetch) {
+    const message = gmailMessageSchema.parse(
+      await gmailRequest(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
+        accessToken,
+      ),
+    );
+    const subject =
+      message.payload.headers?.find(({ name }) => name.toLocaleLowerCase("en-GB") === "subject")
+        ?.value ?? "School communication";
+    const sourceText = extractGmailText(message.payload);
+    if (!sourceText) continue;
+
+    candidates.push({
+      source,
+      externalMessageId: message.id,
+      receivedAt: new Date(Number(message.internalDate)).toISOString(),
+      subject,
+      sourceText: limitGmailSourceText(sourceText),
+    });
   }
 
   return candidates;
@@ -674,12 +704,4 @@ function extractGmailText(payload: z.infer<typeof gmailPartSchema>) {
 
 function decodeBase64Url(value: string) {
   return Buffer.from(value.replaceAll("-", "+").replaceAll("_", "/"), "base64").toString("utf8");
-}
-
-async function gmailRequest(url: string, accessToken: string) {
-  const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!response.ok) throw new Error(`Gmail fetch failed with status ${response.status}`);
-  return response.json();
 }

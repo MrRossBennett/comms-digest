@@ -84,9 +84,6 @@ function SignupForm() {
               <span className="sr-only">Comms Digest</span>
             </Link>
             <h1 className="text-xl font-bold">Create your Comms Digest account</h1>
-            <p className="text-sm leading-6 text-muted-foreground">
-              Set up your Household with no password to remember.
-            </p>
           </div>
           <div className="flex flex-col gap-5">
             <div className="grid gap-2">
@@ -122,10 +119,6 @@ function SignupForm() {
             <span className="relative z-10 bg-background px-2 text-muted-foreground">Or</span>
           </div>
           <ContinueWithGoogleButton callbackURL={redirectUrl} disabled={mutation.isPending} />
-          <p className="text-center text-xs leading-5 text-muted-foreground">
-            Google signs you into Comms Digest. Connecting a Gmail inbox happens later and is
-            optional.
-          </p>
         </div>
       </form>
 

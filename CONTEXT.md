@@ -1,11 +1,11 @@
 # Comms Digest
 
-Comms Digest helps a household understand and act on school communications concerning its children. The initial domain is intentionally school-specific; broader correspondence processing is a possible application of the underlying approach, not part of the product language.
+Comms Digest helps a household understand and act on school communications concerning its students. The initial domain is intentionally school-specific; broader correspondence processing is a possible application of the underlying approach, not part of the product language.
 
 ## Language
 
 **Household**:
-The family unit whose school communications and responsibilities are collected into one view. A **Household** has one **Household Owner**, one or more **Schools**, and one or more **Children** in the first version. It receives one combined **Digest** across all of its **Schools**.
+The family unit whose school communications and responsibilities are collected into one view. A **Household** has one **Household Owner**, one or more **Schools**, and one or more **Students** in the first version. It receives one combined **Digest** across all of its **Schools**.
 _Avoid_: Account, tenant, customer
 
 **Household Owner**:
@@ -16,34 +16,39 @@ _Avoid_: User, administrator, parent account
 A clearly labelled synthetic **Household** used to let an authenticated **Household Owner** experience Comms Digest before onboarding is available. It must not be presented as belonging to the **Household Owner** or replace the future creation of their own **Household**.
 _Avoid_: Default household, sample account
 
-**Child**:
+**Student**:
 A young person in a **Household** whose **School** and school year help determine which communications are relevant.
 The first version stores only a display name chosen by the **Household Owner**, school year, optional class, and **School**. A first name or nickname is sufficient; surnames, dates of birth, gender, and other identifiers are not collected.
-_Avoid_: Student, pupil, dependent
+_Avoid_: Child, pupil, dependent
 
 **School**:
-An educational organisation attended by one or more **Children** in a **Household** and responsible for issuing relevant **School Communications**. Each **Child** belongs to one **School** in the first version; a **Household** may contain multiple **Schools**.
+An educational organisation attended by one or more **Students** in a **Household** and responsible for issuing relevant **School Communications**. Each **Student** belongs to one **School** in the first version; a **Household** may contain multiple **Schools**.
 _Avoid_: Institution, organisation, provider
 
 **School Communication**:
-A message or document issued by a school or school-related service that may contain information or responsibilities relevant to one or more **Children**.
-Once fetched from a confirmed **Communication Source**, its source text is stored as an immutable snapshot. Its School and selected-Child boundary is inherited from **Source Review** and cannot be widened by extraction or reconciliation.
+A message or document issued by a school or school-related service that may contain information or responsibilities relevant to one or more **Students**.
+Once fetched from a confirmed **Communication Source**, its source text is stored as an immutable snapshot. Its School and selected-Student boundary is inherited from **Source Review** and cannot be widened by extraction or reconciliation.
 _Avoid_: Correspondence, content, document
 
 **Communication Source**:
-A sender or recurring origin of **School Communications**, such as a school office, teacher, club, or school messaging service. A confirmed **Communication Source** may be relevant to one or more **Children** or the whole **Household**.
+A sender or recurring origin of **School Communications**, such as a school office, teacher, club, or school messaging service. A confirmed **Communication Source** may be relevant to one or more **Students** or the whole **Household**.
 Discovery stores sender identity, message count, and most recent date only. Message subjects and bodies are not persisted during discovery.
 _Avoid_: Sender rule, Gmail filter, contact
 
 **Source Review**:
 The onboarding step in which the **Household Owner** confirms, rejects, and assigns discovered **Communication Sources** before the first **Digest** is produced.
-Gmail permission is requested separately from sign-in and is read-only. A confirmed **Communication Source** applies to the whole **Household**, one **School**, or selected **Children** at one **School**.
+Gmail permission is requested separately from sign-in and is read-only. A confirmed **Communication Source** applies to the whole **Household**, one **School**, or selected **Students** at one **School**.
 _Avoid_: Inbox setup, sender configuration
 
 **Digest**:
 A prioritised view of relevant information and responsibilities derived from **School Communications** for a **Household**. It is organised into **Act Now**, **Coming Up**, and **Good to Know**.
 The first version is refreshed manually. Repeated fetches skip already-seen external message identifiers and rebuild one combined **Digest** from the Household's stored evidence.
 _Avoid_: Summary, feed, newsletter
+
+**Ingestion scaling boundary**:
+The beta performs Gmail discovery and communication fetching synchronously, with conservative per-mailbox request concurrency and retries for temporary provider limits. This is appropriate for early usage but is not the final ingestion architecture.
+Each manual beta fetch processes at most ten new Gmail messages, limits each stored and model-processed source snapshot to 20,000 characters, and limits model extraction output to 2,000 tokens per message.
+At scale, ingestion should move to a durable background queue with per-**Household** scan locks, bounded concurrency across accounts, retry backoff with jitter, incremental Gmail history-based sync, observable progress and failures, project-quota monitoring, and explicit per-run AI spend limits.
 
 **Act Now**:
 The part of a **Digest** containing unresolved **Responsibilities** that require the **Household Owner** to do or decide something, usually by a stated deadline.
@@ -66,7 +71,7 @@ Something the **Household Owner** must do or decide in response to a **School Co
 _Avoid_: Action, task, to-do
 
 **Audience**:
-The people or school group to whom information from a **School Communication** applies. An **Audience** may be child-specific, group-specific, school-wide, household-wide, or unresolved; the original audience wording is preserved even when it is resolved to one or more **Children**.
+The people or school group to whom information from a **School Communication** applies. An **Audience** may be student-specific, group-specific, school-wide, household-wide, or unresolved; the original audience wording is preserved even when it is resolved to one or more **Students**.
 _Avoid_: Target, recipient, year-group tag
 
 **Claim**:
@@ -85,7 +90,7 @@ _Avoid_: Chatbot, general assistant, Q&A
 
 **Household Owner:** Did anything important come in from school this week?
 
-**Comms Digest:** The latest **Digest** contains two **School Communications** relevant to your **Household**: a Year 4 swimming payment for one **Child**, and a whole-school closure notice relevant to both **Children**.
+**Comms Digest:** The latest **Digest** contains two **School Communications** relevant to your **Household**: a Year 4 swimming payment for one **Student**, and a whole-school closure notice relevant to both **Students**.
 
 **Household Owner:** Add the swimming lesson to my calendar.
 

@@ -53,7 +53,7 @@ export const householdSetupSchema = z
       context.addIssue({
         code: "custom",
         path: ["children"],
-        message: "Each Child needs a unique key",
+        message: "Each Student needs a unique key",
       });
     }
 
@@ -62,7 +62,7 @@ export const householdSetupSchema = z
         context.addIssue({
           code: "custom",
           path: ["children", index, "schoolKey"],
-          message: "Each Child must be assigned to a School in the Household",
+          message: "Each Student must be assigned to a School in the Household",
         });
       }
     });

@@ -80,7 +80,7 @@ export async function saveHouseholdForOwner(ownerUserId: string, input: unknown)
     const schoolIdFor = (schoolKey: string) => {
       const schoolId = schoolIdsByKey.get(schoolKey);
       if (!schoolId) {
-        throw new Error(`Child references unknown School ${schoolKey}`);
+        throw new Error(`Student references unknown School ${schoolKey}`);
       }
       return schoolId;
     };
@@ -117,7 +117,7 @@ export async function saveHouseholdForOwner(ownerUserId: string, input: unknown)
     const childIdFor = (childKey: string) => {
       const childId = childIdsByKey.get(childKey);
       if (!childId) {
-        throw new Error(`Unknown Child ${childKey}`);
+        throw new Error(`Unknown Student ${childKey}`);
       }
       return childId;
     };

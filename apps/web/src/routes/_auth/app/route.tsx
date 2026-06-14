@@ -32,15 +32,25 @@ function AppLayout() {
           </div>
           <div className="flex items-center gap-2">
             <nav className="hidden items-center gap-1 sm:flex" aria-label="Main navigation">
-              <Button variant="ghost" size="sm" render={<Link to="/app" />}>
+              <Button variant="ghost" size="sm" render={<Link to="/app" />} nativeButton={false}>
                 <HomeIcon />
                 Household
               </Button>
-              <Button variant="ghost" size="sm" render={<Link to="/app/demo" />}>
+              <Button
+                variant="ghost"
+                size="sm"
+                render={<Link to="/app/demo" />}
+                nativeButton={false}
+              >
                 <SparklesIcon />
                 Demo
               </Button>
-              <Button variant="ghost" size="sm" render={<Link to="/app/sources" />}>
+              <Button
+                variant="ghost"
+                size="sm"
+                render={<Link to="/app/sources" />}
+                nativeButton={false}
+              >
                 <MailIcon />
                 Sources
               </Button>

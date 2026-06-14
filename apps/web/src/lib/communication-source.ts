@@ -16,7 +16,7 @@ export const communicationSourceReviewSchema = z
       if (review.schoolId || review.childIds.length > 0) {
         context.addIssue({
           code: "custom",
-          message: "Household sources cannot be assigned to a School or individual Children",
+          message: "Household sources cannot be assigned to a School or individual Students",
         });
       }
       return;
@@ -34,7 +34,7 @@ export const communicationSourceReviewSchema = z
       context.addIssue({
         code: "custom",
         path: ["childIds"],
-        message: "School sources cannot also select individual Children",
+        message: "School sources cannot also select individual Students",
       });
     }
 
@@ -42,7 +42,7 @@ export const communicationSourceReviewSchema = z
       context.addIssue({
         code: "custom",
         path: ["childIds"],
-        message: "Choose at least one Child",
+        message: "Choose at least one Student",
       });
     }
   });
@@ -61,5 +61,5 @@ export function parseSender(value: string) {
 }
 
 export function hasGmailReadonlyScope(scope: string | null) {
-  return scope?.split(/\s+/).includes("https://www.googleapis.com/auth/gmail.readonly") ?? false;
+  return scope?.split(/[\s,]+/).includes("https://www.googleapis.com/auth/gmail.readonly") ?? false;
 }

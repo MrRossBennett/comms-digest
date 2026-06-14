@@ -5,10 +5,13 @@ import { z } from "zod";
 import { modelExtractionSchema, type ModelExtraction, type SchoolCommunication } from "./contracts";
 import { alignExtractionCitations } from "./grounding";
 
+export const MAX_EXTRACTION_OUTPUT_TOKENS = 2_000;
+
 export const liveModelConfigSchema = z.object({
   provider: z.literal("anthropic").default("anthropic"),
   modelId: z.string().min(1).default("claude-haiku-4-5-20251001"),
   promptVersion: z.string().min(1).default("school-extraction-v4"),
+  maxOutputTokens: z.int().positive().default(MAX_EXTRACTION_OUTPUT_TOKENS),
   apiKey: z.preprocess((value) => (value === "" ? undefined : value), z.string().min(1).optional()),
 });
 
@@ -26,6 +29,7 @@ const generationResultSchema = z.object({
 type GenerationRequest = {
   communication: SchoolCommunication;
   modelId: string;
+  maxOutputTokens: number;
   apiKey?: string;
 };
 
@@ -82,6 +86,7 @@ async function generateWithAiSdk(request: GenerationRequest) {
     }),
     prompt: buildPrompt(request.communication),
     temperature: 0,
+    maxOutputTokens: request.maxOutputTokens,
   });
 
   return {
@@ -109,6 +114,7 @@ export function createLiveExtractor(
         await generate({
           communication,
           modelId: config.modelId,
+          maxOutputTokens: config.maxOutputTokens,
           apiKey: config.apiKey,
         }),
       );
