@@ -5,7 +5,7 @@ export const Route = createFileRoute("/_guest")({
   component: RouteComponent,
   beforeLoad: async ({ context }) => {
     // Redirect path when user is already present,
-    // or after successful login/signup
+    // or after successful sign-in/sign-up
     const REDIRECT_URL = "/app";
 
     const user = await context.queryClient.ensureQueryData({
