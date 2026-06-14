@@ -11,6 +11,7 @@ import {
   InfoIcon,
   LoaderCircleIcon,
   MailIcon,
+  EyeOffIcon,
   PencilIcon,
   RefreshCwIcon,
   RotateCcwIcon,
@@ -19,10 +20,12 @@ import {
 import { Fragment } from "react";
 import { toast } from "sonner";
 
+import { digestEvidenceKey, isDigestItemDismissed } from "#/lib/digest-item-status";
 import { getErrorMessage } from "#/lib/error-message";
 import {
   $fetchNewCommunications,
   $getHouseholdDigest,
+  $setHouseholdDigestItemDismissed,
   $setHouseholdResponsibilityCompleted,
 } from "#/lib/household-digest.functions";
 import { $getHousehold } from "#/lib/household.functions";
@@ -61,6 +64,16 @@ function HouseholdHome() {
     },
     onError: () => {
       toast.error("Responsibility status could not be updated.");
+    },
+  });
+  const dismissalMutation = useMutation({
+    mutationFn: (data: { claimIds: string[]; responsibilityIds: string[]; dismissed: boolean }) =>
+      $setHouseholdDigestItemDismissed({ data }),
+    onSuccess: async () => {
+      await router.invalidate({ sync: true });
+    },
+    onError: () => {
+      toast.error("Digest item status could not be updated.");
     },
   });
 
@@ -124,11 +137,25 @@ function HouseholdHome() {
           communications={digestData.communications}
           householdChildren={household.children}
           completedResponsibilityIds={digestData.completedResponsibilityIds}
+          dismissedClaimIds={digestData.dismissedClaimIds}
+          dismissedResponsibilityIds={digestData.dismissedResponsibilityIds}
           pendingResponsibilityId={
             statusMutation.isPending ? statusMutation.variables?.responsibilityId : undefined
           }
+          pendingDismissedItemKey={
+            dismissalMutation.isPending
+              ? digestEvidenceKey(dismissalMutation.variables.claimIds)
+              : undefined
+          }
           onStatusChange={(responsibilityId, completed) =>
             statusMutation.mutate({ responsibilityId, completed })
+          }
+          onDismissedChange={(item, dismissed) =>
+            dismissalMutation.mutate({
+              claimIds: item.claims.map(({ id }) => id),
+              responsibilityIds: item.responsibilities.map(({ id }) => id),
+              dismissed,
+            })
           }
         />
       ) : (
@@ -168,25 +195,43 @@ function HouseholdDigest({
   communications,
   householdChildren,
   completedResponsibilityIds,
+  dismissedClaimIds,
+  dismissedResponsibilityIds,
   pendingResponsibilityId,
+  pendingDismissedItemKey,
   onStatusChange,
+  onDismissedChange,
 }: {
   digest: Digest;
   communications: SchoolCommunication[];
   householdChildren: Array<{ id: string; displayName: string; schoolYear: string }>;
   completedResponsibilityIds: string[];
+  dismissedClaimIds: string[];
+  dismissedResponsibilityIds: string[];
   pendingResponsibilityId?: string;
+  pendingDismissedItemKey?: string;
   onStatusChange: (responsibilityId: string, completed: boolean) => void;
+  onDismissedChange: (item: DigestItemType, dismissed: boolean) => void;
 }) {
   const completed = new Set(completedResponsibilityIds);
-  const actNow = digest.actNow.filter((item) =>
-    item.responsibilities.some(({ id }) => !completed.has(id)),
+  const dismissedClaims = new Set(dismissedClaimIds);
+  const dismissedResponsibilities = new Set(dismissedResponsibilityIds);
+  const isDismissed = (item: DigestItemType) =>
+    isDigestItemDismissed(item, dismissedClaims, dismissedResponsibilities);
+  const dismissedItems = [...digest.actNow, ...digest.comingUp, ...digest.goodToKnow].filter(
+    isDismissed,
+  );
+  const actNow = digest.actNow.filter(
+    (item) => !isDismissed(item) && item.responsibilities.some(({ id }) => !completed.has(id)),
   );
   const completedItems = digest.actNow.filter(
     (item) =>
+      !isDismissed(item) &&
       item.responsibilities.length > 0 &&
       item.responsibilities.every(({ id }) => completed.has(id)),
   );
+  const comingUp = digest.comingUp.filter((item) => !isDismissed(item));
+  const goodToKnow = digest.goodToKnow.filter((item) => !isDismissed(item));
 
   return (
     <div className="grid gap-8">
@@ -199,19 +244,31 @@ function HouseholdDigest({
           <div className="grid gap-3">
             {actNow.map((item) => (
               <DigestItem
-                key={item.title}
+                key={digestEvidenceKey(item.claims.map(({ id }) => id))}
                 item={item}
                 householdChildren={householdChildren}
                 communications={communications}
-                action={{
-                  label: "Mark completed",
-                  icon: <CheckIcon />,
-                  onClick: () => {
-                    const responsibility = item.responsibilities[0];
-                    if (responsibility) onStatusChange(responsibility.id, true);
+                actions={[
+                  {
+                    label: "Dismiss",
+                    icon: <EyeOffIcon />,
+                    variant: "outline",
+                    onClick: () => onDismissedChange(item, true),
+                    pending:
+                      digestEvidenceKey(item.claims.map(({ id }) => id)) ===
+                      pendingDismissedItemKey,
                   },
-                  pending: item.responsibilities[0]?.id === pendingResponsibilityId,
-                }}
+                  {
+                    label: "Mark completed",
+                    icon: <CheckIcon />,
+                    variant: "default",
+                    onClick: () => {
+                      const responsibility = item.responsibilities[0];
+                      if (responsibility) onStatusChange(responsibility.id, true);
+                    },
+                    pending: item.responsibilities[0]?.id === pendingResponsibilityId,
+                  },
+                ]}
               />
             ))}
           </div>
@@ -225,15 +282,26 @@ function HouseholdDigest({
         description="Dates and activities to anticipate."
         icon={<CalendarDaysIcon />}
       >
-        {digest.comingUp.length > 0 ? (
+        {comingUp.length > 0 ? (
           <div className="grid gap-3">
-            {digest.comingUp.map((item) => (
+            {comingUp.map((item) => (
               <DigestItem
-                key={item.title}
+                key={digestEvidenceKey(item.claims.map(({ id }) => id))}
                 item={item}
                 householdChildren={householdChildren}
                 communications={communications}
                 detail={formatItemDate(item)}
+                actions={[
+                  {
+                    label: "Dismiss",
+                    icon: <EyeOffIcon />,
+                    variant: "outline",
+                    onClick: () => onDismissedChange(item, true),
+                    pending:
+                      digestEvidenceKey(item.claims.map(({ id }) => id)) ===
+                      pendingDismissedItemKey,
+                  },
+                ]}
               />
             ))}
           </div>
@@ -247,14 +315,25 @@ function HouseholdDigest({
         description="Useful updates that do not need action."
         icon={<InfoIcon />}
       >
-        {digest.goodToKnow.length > 0 ? (
+        {goodToKnow.length > 0 ? (
           <div className="grid gap-3">
-            {digest.goodToKnow.map((item) => (
+            {goodToKnow.map((item) => (
               <DigestItem
-                key={item.title}
+                key={digestEvidenceKey(item.claims.map(({ id }) => id))}
                 item={item}
                 householdChildren={householdChildren}
                 communications={communications}
+                actions={[
+                  {
+                    label: "Dismiss",
+                    icon: <EyeOffIcon />,
+                    variant: "outline",
+                    onClick: () => onDismissedChange(item, true),
+                    pending:
+                      digestEvidenceKey(item.claims.map(({ id }) => id)) ===
+                      pendingDismissedItemKey,
+                  },
+                ]}
               />
             ))}
           </div>
@@ -272,45 +351,62 @@ function HouseholdDigest({
           <div className="grid gap-3">
             {completedItems.map((item) => (
               <DigestItem
-                key={item.title}
+                key={digestEvidenceKey(item.claims.map(({ id }) => id))}
                 item={item}
                 householdChildren={householdChildren}
                 communications={communications}
-                action={{
-                  label: "Reopen",
-                  icon: <RotateCcwIcon />,
-                  onClick: () => {
-                    const responsibility = item.responsibilities[0];
-                    if (responsibility) onStatusChange(responsibility.id, false);
+                actions={[
+                  {
+                    label: "Reopen",
+                    icon: <RotateCcwIcon />,
+                    variant: "outline",
+                    onClick: () => {
+                      const responsibility = item.responsibilities[0];
+                      if (responsibility) onStatusChange(responsibility.id, false);
+                    },
+                    pending: item.responsibilities[0]?.id === pendingResponsibilityId,
                   },
-                  pending: item.responsibilities[0]?.id === pendingResponsibilityId,
-                }}
+                ]}
               />
             ))}
           </div>
         </DigestSection>
       ) : null}
+
+      {dismissedItems.length > 0 ? (
+        <DismissedDigestItems
+          items={dismissedItems}
+          householdChildren={householdChildren}
+          communications={communications}
+          pendingDismissedItemKey={pendingDismissedItemKey}
+          onReopen={(item) => onDismissedChange(item, false)}
+        />
+      ) : null}
     </div>
   );
 }
+
+type DigestItemType = Digest["actNow"][number];
+type DigestItemAction = {
+  label: string;
+  icon: React.ReactNode;
+  variant: "default" | "outline";
+  onClick: () => void;
+  pending: boolean;
+};
 
 function DigestItem({
   item,
   householdChildren,
   communications,
   detail,
-  action,
+  actions = [],
 }: {
-  item: Digest["actNow"][number];
+  item: DigestItemType;
   householdChildren: Array<{ id: string; displayName: string }>;
   communications: SchoolCommunication[];
   detail?: string;
-  action?: {
-    label: string;
-    icon: React.ReactNode;
-    onClick: () => void;
-    pending: boolean;
-  };
+  actions?: DigestItemAction[];
 }) {
   const names = householdChildren
     .filter(({ id }) => item.childIds.includes(id))
@@ -326,20 +422,77 @@ function DigestItem({
             Applies to {formatNames(names)}
           </p>
         </div>
-        {action ? (
-          <Button
-            type="button"
-            variant={action.label === "Reopen" ? "outline" : "default"}
-            disabled={action.pending}
-            onClick={action.onClick}
-          >
-            {action.pending ? <LoaderCircleIcon className="animate-spin" /> : action.icon}
-            {action.label}
-          </Button>
+        {actions.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {actions.map((action) => (
+              <Button
+                key={action.label}
+                type="button"
+                variant={action.variant}
+                disabled={action.pending}
+                onClick={action.onClick}
+              >
+                {action.pending ? <LoaderCircleIcon className="animate-spin" /> : action.icon}
+                {action.label}
+              </Button>
+            ))}
+          </div>
         ) : null}
       </div>
       <SourceDisclosure communications={communications} claims={item.claims} />
     </article>
+  );
+}
+
+function DismissedDigestItems({
+  items,
+  householdChildren,
+  communications,
+  pendingDismissedItemKey,
+  onReopen,
+}: {
+  items: DigestItemType[];
+  householdChildren: Array<{ id: string; displayName: string }>;
+  communications: SchoolCommunication[];
+  pendingDismissedItemKey?: string;
+  onReopen: (item: DigestItemType) => void;
+}) {
+  return (
+    <details className="group overflow-hidden rounded-2xl border bg-card">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 hover:bg-muted/40 sm:p-6 [&::-webkit-details-marker]:hidden">
+        <div>
+          <h2 className="font-semibold tracking-tight">
+            Dismissed
+            <span className="ml-2 text-sm font-normal text-muted-foreground">({items.length})</span>
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Hidden from your active Household Digest.
+          </p>
+        </div>
+        <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="grid gap-3 border-t bg-muted/20 p-4 sm:p-6">
+        {items.map((item) => (
+          <DigestItem
+            key={digestEvidenceKey(item.claims.map(({ id }) => id))}
+            item={item}
+            householdChildren={householdChildren}
+            communications={communications}
+            detail={formatItemDate(item)}
+            actions={[
+              {
+                label: "Reopen",
+                icon: <RotateCcwIcon />,
+                variant: "outline",
+                onClick: () => onReopen(item),
+                pending:
+                  digestEvidenceKey(item.claims.map(({ id }) => id)) === pendingDismissedItemKey,
+              },
+            ]}
+          />
+        ))}
+      </div>
+    </details>
   );
 }
 
