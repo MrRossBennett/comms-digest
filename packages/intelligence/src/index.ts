@@ -1,4 +1,5 @@
 export * from "./benchmark";
+export * from "./chat";
 export * from "./corpus-pipeline";
 export * from "./contracts";
 export * from "./dates";

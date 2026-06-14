@@ -67,6 +67,9 @@ catalog:
   vite-plus: latest
   vitest: npm:@voidzero-dev/vite-plus-test@latest
   zod: 4.4.3
+  use-stick-to-bottom: ^1.1.6
+  streamdown: ^2.5.0
+  "@ai-sdk/react": ^3.0.206
 
 catalogMode: prefer
 
