@@ -19,6 +19,7 @@
     "@langchain/langgraph": "catalog:",
     "ai": "catalog:",
     "braintrust": "catalog:",
+    "chrono-node": "catalog:",
     "uuid": "catalog:",
     "zod": "catalog:"
   },

@@ -1,103 +1,60 @@
-const weekdayIndexes = new Map([
-  ["sunday", 0],
-  ["monday", 1],
-  ["tuesday", 2],
-  ["wednesday", 3],
-  ["thursday", 4],
-  ["friday", 5],
-  ["saturday", 6],
-]);
-
-const monthIndexes = new Map([
-  ["january", 0],
-  ["february", 1],
-  ["march", 2],
-  ["april", 3],
-  ["may", 4],
-  ["june", 5],
-  ["july", 6],
-  ["august", 7],
-  ["september", 8],
-  ["october", 9],
-  ["november", 10],
-  ["december", 11],
-]);
+import * as chrono from "chrono-node";
 
 export function resolveRelativeDate(
   originalWording: string,
   receivedAt: string,
   householdTimezone: string,
 ) {
-  const dateParts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: householdTimezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date(receivedAt));
-  const values = Object.fromEntries(dateParts.map((part) => [part.type, part.value]));
-  const localDate = new Date(
-    Date.UTC(Number(values.year), Number(values.month) - 1, Number(values.day)),
+  const wording = originalWording.trim();
+  const referenceInstant = new Date(receivedAt);
+  const timezone = getTimezoneOffsetMinutes(referenceInstant, householdTimezone);
+  const results = chrono.en.GB.parse(
+    wording,
+    { instant: referenceInstant, timezone },
+    { forwardDate: true },
   );
+  const result = results.length === 1 ? results[0] : undefined;
 
-  const weekdayMatch =
-    /^(next\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i.exec(
-      originalWording.trim(),
-    );
-  if (weekdayMatch) {
-    return resolveWeekday(originalWording, localDate, weekdayMatch);
-  }
-
-  const statedDateMatch =
-    /^(?:(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s+)?(\d{1,2})\s+(january|february|march|april|may|june|july|august|september|october|november|december)$/i.exec(
-      originalWording.trim(),
-    );
-  if (statedDateMatch) {
-    return resolveStatedDate(originalWording, localDate, statedDateMatch);
-  }
-
-  return { originalWording, resolvedDate: null };
-}
-
-function resolveWeekday(originalWording: string, localDate: Date, match: RegExpExecArray) {
-  const targetWeekday = weekdayIndexes.get(match[2]?.toLowerCase() ?? "");
-  if (targetWeekday === undefined) {
-    throw new Error(`Unsupported weekday: ${originalWording}`);
-  }
-
-  let daysAhead = (targetWeekday - localDate.getUTCDay() + 7) % 7;
-  if (match[1] && daysAhead === 0) {
-    daysAhead = 7;
-  }
-  localDate.setUTCDate(localDate.getUTCDate() + daysAhead);
-
-  return {
-    originalWording,
-    resolvedDate: localDate.toISOString().slice(0, 10),
-  };
-}
-
-function resolveStatedDate(originalWording: string, localDate: Date, match: RegExpExecArray) {
-  const day = Number(match[2]);
-  const month = monthIndexes.get(match[3]?.toLowerCase() ?? "");
-  if (month === undefined) {
+  if (!result || result.index !== 0 || result.text.length !== wording.length) {
     return { originalWording, resolvedDate: null };
   }
 
-  const candidates = [-1, 0, 1].map(
-    (yearOffset) => new Date(Date.UTC(localDate.getUTCFullYear() + yearOffset, month, day)),
-  );
-  const candidate = candidates.reduce((closest, current) =>
-    Math.abs(current.getTime() - localDate.getTime()) <
-    Math.abs(closest.getTime() - localDate.getTime())
-      ? current
-      : closest,
-  );
-  const statedWeekday = match[1] ? weekdayIndexes.get(match[1].toLowerCase()) : undefined;
-  const isValidDate = candidate.getUTCMonth() === month && candidate.getUTCDate() === day;
-  const isValidWeekday = statedWeekday === undefined || candidate.getUTCDay() === statedWeekday;
+  const year = result.start.get("year");
+  const month = result.start.get("month");
+  const day = result.start.get("day");
+  if (year === null || month === null || day === null) {
+    return { originalWording, resolvedDate: null };
+  }
+
+  const resolved = new Date(Date.UTC(year, month - 1, day));
+  const statedWeekday = result.start.isCertain("weekday") ? result.start.get("weekday") : undefined;
+  const isValidDate =
+    resolved.getUTCFullYear() === year &&
+    resolved.getUTCMonth() === month - 1 &&
+    resolved.getUTCDate() === day;
+  const isValidWeekday = statedWeekday === undefined || resolved.getUTCDay() === statedWeekday;
 
   return {
     originalWording,
-    resolvedDate: isValidDate && isValidWeekday ? candidate.toISOString().slice(0, 10) : null,
+    resolvedDate: isValidDate && isValidWeekday ? resolved.toISOString().slice(0, 10) : null,
   };
+}
+
+function getTimezoneOffsetMinutes(instant: Date, timezone: string) {
+  const timeZoneName = new Intl.DateTimeFormat("en-GB", {
+    timeZone: timezone,
+    timeZoneName: "longOffset",
+  })
+    .formatToParts(instant)
+    .find(({ type }) => type === "timeZoneName")?.value;
+
+  if (timeZoneName === "GMT") return 0;
+
+  const match = /^GMT([+-])(\d{2}):(\d{2})$/.exec(timeZoneName ?? "");
+  if (!match) {
+    throw new Error(`Could not determine timezone offset for ${timezone}`);
+  }
+
+  const minutes = Number(match[2]) * 60 + Number(match[3]);
+  return match[1] === "-" ? -minutes : minutes;
 }

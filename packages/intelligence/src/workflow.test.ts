@@ -73,7 +73,7 @@ test("runs injected extraction and deterministic grounding as an explicit workfl
   expect(result.validated?.claims).toHaveLength(2);
 });
 
-test("fails closed when the injected model output is not grounded", async () => {
+test("fails closed on an ungrounded Claim without failing the communication", async () => {
   const workflow = createExtractionWorkflow({
     extract: async () => ({
       claims: [
@@ -88,15 +88,16 @@ test("fails closed when the injected model output is not grounded", async () => 
     }),
   });
 
-  await expect(
-    workflow.invoke({
-      communication: {
-        id: "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97b01",
-        kind: "email",
-        receivedAt: "2026-01-12T16:30:00.000Z",
-        householdTimezone: "Europe/London",
-        sourceText: "Swimming starts next Monday.",
-      },
-    }),
-  ).rejects.toThrow();
+  const result = await workflow.invoke({
+    communication: {
+      id: "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97b01",
+      kind: "email",
+      receivedAt: "2026-01-12T16:30:00.000Z",
+      householdTimezone: "Europe/London",
+      sourceText: "Swimming starts next Monday.",
+    },
+  });
+
+  expect(result.validated?.claims).toEqual([]);
+  expect(result.validated?.responsibilities).toEqual([]);
 });

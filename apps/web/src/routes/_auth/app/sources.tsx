@@ -6,6 +6,7 @@ import { createFileRoute, Link, redirect, useRouter } from "@tanstack/react-rout
 import {
   ArrowLeftIcon,
   CheckIcon,
+  ChevronDownIcon,
   InboxIcon,
   LoaderCircleIcon,
   MailIcon,
@@ -63,7 +64,8 @@ function SourceReviewPage() {
     },
   });
   const pendingSources = sourceReview.sources.filter(({ status }) => status === "pending");
-  const reviewedSources = sourceReview.sources.filter(({ status }) => status !== "pending");
+  const confirmedSources = sourceReview.sources.filter(({ status }) => status === "confirmed");
+  const rejectedSources = sourceReview.sources.filter(({ status }) => status === "rejected");
 
   const connectGmail = async () => {
     setConnecting(true);
@@ -110,12 +112,18 @@ function SourceReviewPage() {
             </div>
             <div>
               <h2 className="font-semibold tracking-tight">
-                {sourceReview.gmailConnected ? "Gmail connected" : "Connect Gmail"}
+                {sourceReview.gmailConnected
+                  ? "Gmail connected"
+                  : sourceReview.gmailNeedsReconnect
+                    ? "Reconnect Gmail"
+                    : "Connect Gmail"}
               </h2>
               <p className="mt-1 max-w-xl text-sm leading-6 text-muted-foreground">
                 {sourceReview.gmailConnected
                   ? "Read-only access is ready. Scanning happens only when you ask."
-                  : "Grant read-only Gmail access separately from sign-in. Comms Digest cannot send, edit, or delete email."}
+                  : sourceReview.gmailNeedsReconnect
+                    ? "Your previous access has expired. Reconnect once to keep Gmail access working."
+                    : "Grant read-only Gmail access separately from sign-in. Comms Digest cannot send, edit, or delete email."}
               </p>
             </div>
           </div>
@@ -135,7 +143,7 @@ function SourceReviewPage() {
           ) : (
             <Button type="button" disabled={connecting} onClick={connectGmail}>
               {connecting ? <LoaderCircleIcon className="animate-spin" /> : <MailIcon />}
-              Connect Gmail
+              {sourceReview.gmailNeedsReconnect ? "Reconnect Gmail" : "Connect Gmail"}
             </Button>
           )}
         </div>
@@ -191,9 +199,17 @@ function SourceReviewPage() {
             onReview={(data) => reviewMutation.mutate({ data })}
           />
           <SourceGroup
-            title="Reviewed"
-            description="These decisions will control which messages enter the Digest pipeline."
-            sources={reviewedSources}
+            title="Confirmed sources"
+            description="Messages from these senders can enter the Digest pipeline."
+            sources={confirmedSources}
+            sourceReview={sourceReview}
+            pendingSourceId={
+              reviewMutation.isPending ? reviewMutation.variables?.data.sourceId : undefined
+            }
+            onReview={(data) => reviewMutation.mutate({ data })}
+          />
+          <RejectedSourceGroup
+            sources={rejectedSources}
             sourceReview={sourceReview}
             pendingSourceId={
               reviewMutation.isPending ? reviewMutation.variables?.data.sourceId : undefined
@@ -245,6 +261,51 @@ function SourceGroup({
   );
 }
 
+function RejectedSourceGroup({
+  sources,
+  sourceReview,
+  pendingSourceId,
+  onReview,
+}: {
+  sources: Source[];
+  sourceReview: SourceReview;
+  pendingSourceId?: string;
+  onReview: (data: Parameters<typeof $saveCommunicationSourceReview>[0]["data"]) => void;
+}) {
+  if (sources.length === 0) return null;
+
+  return (
+    <details className="group overflow-hidden rounded-2xl border bg-card">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 hover:bg-muted/40 sm:p-6 [&::-webkit-details-marker]:hidden">
+        <div>
+          <h2 className="font-semibold tracking-tight">
+            Rejected sources
+            <span className="ml-2 text-sm font-normal text-muted-foreground">
+              ({sources.length})
+            </span>
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            These senders are excluded from the Digest pipeline.
+          </p>
+        </div>
+        <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="grid gap-4 border-t bg-muted/20 p-4 sm:p-6">
+        {sources.map((source) => (
+          <SourceCard
+            key={source.id}
+            source={source}
+            schools={sourceReview.household.schools}
+            householdChildren={sourceReview.household.children}
+            pending={pendingSourceId === source.id}
+            onReview={onReview}
+          />
+        ))}
+      </div>
+    </details>
+  );
+}
+
 function SourceCard({
   source,
   schools,
@@ -285,7 +346,13 @@ function SourceCard({
   };
 
   return (
-    <article className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
+    <article
+      className={
+        source.status === "rejected"
+          ? "rounded-2xl border border-destructive/25 bg-card p-5 shadow-sm sm:p-6"
+          : "rounded-2xl border bg-card p-5 shadow-sm sm:p-6"
+      }
+    >
       <div className="flex flex-col gap-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
@@ -409,12 +476,14 @@ function SourceCard({
 function SourceStatus({ status }: { status: Source["status"] }) {
   const label =
     status === "pending" ? "Needs review" : status === "confirmed" ? "Confirmed" : "Rejected";
+  const className =
+    status === "rejected"
+      ? "rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive"
+      : status === "confirmed"
+        ? "rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+        : "rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground";
 
-  return (
-    <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-      {label}
-    </span>
-  );
+  return <span className={className}>{label}</span>;
 }
 
 function formatDate(value: Date) {
