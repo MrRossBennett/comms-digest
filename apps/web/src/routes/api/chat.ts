@@ -1,6 +1,7 @@
 import { auth } from "@repo/auth/auth";
 import {
   CHAT_REFUSAL,
+  chatRetrievalQuery,
   latestUserQuestion,
   selectChatEvidence,
   streamGroundedChat,
@@ -49,7 +50,10 @@ export const Route = createFileRoute("/api/chat")({
         }
 
         const availableEvidence = await listGroundedChatEvidence(session.user.id);
-        const selectedEvidence = selectChatEvidence(question, availableEvidence);
+        const selectedEvidence = selectChatEvidence(
+          chatRetrievalQuery(messages),
+          availableEvidence,
+        );
         const metadata: GroundedChatMetadata = { sources: selectedEvidence };
 
         if (selectedEvidence.length === 0) {
