@@ -85,6 +85,20 @@ export function reconcileDigest(input: unknown) {
       communicationClaims.map((claim) => [claim.id, communication]),
     ),
   );
+  const schoolIdByClaimId = new Map(
+    extractions.flatMap(({ communication, claims: communicationClaims }) =>
+      communicationClaims.map((claim) => [claim.id, communication.schoolId ?? null]),
+    ),
+  );
+  const schoolIdByResponsibilityId = new Map(
+    responsibilities.map((responsibility) => {
+      const firstClaimId = responsibility.supportingClaimIds[0];
+      return [
+        responsibility.id,
+        firstClaimId ? (schoolIdByClaimId.get(firstClaimId) ?? null) : null,
+      ];
+    }),
+  );
   const consumedClaimIds = new Set<string>();
   const consumedResponsibilityIds = new Set<string>();
   const items: Array<{
@@ -95,11 +109,16 @@ export function reconcileDigest(input: unknown) {
   }> = [];
 
   for (const cancellation of claims.filter((claim) => /\bcancelled\b/i.test(claim.content))) {
-    const relatedClaims = claims.filter((claim) =>
-      sharesTopic(cancellation.content, claim.content),
+    const cancellationSchoolId = schoolIdByClaimId.get(cancellation.id) ?? null;
+    const relatedClaims = claims.filter(
+      (claim) =>
+        (schoolIdByClaimId.get(claim.id) ?? null) === cancellationSchoolId &&
+        sharesTopic(cancellation.content, claim.content),
     );
-    const relatedResponsibilities = responsibilities.filter((responsibility) =>
-      sharesTopic(cancellation.content, responsibility.title),
+    const relatedResponsibilities = responsibilities.filter(
+      (responsibility) =>
+        (schoolIdByResponsibilityId.get(responsibility.id) ?? null) === cancellationSchoolId &&
+        sharesTopic(cancellation.content, responsibility.title),
     );
 
     relatedClaims.forEach(({ id }) => consumedClaimIds.add(id));
@@ -117,11 +136,8 @@ export function reconcileDigest(input: unknown) {
   );
   const responsibilitiesByTitle = new Map<string, typeof activeResponsibilities>();
   for (const responsibility of activeResponsibilities) {
-    const title = responsibility.title.toLocaleLowerCase("en-GB");
-    responsibilitiesByTitle.set(title, [
-      ...(responsibilitiesByTitle.get(title) ?? []),
-      responsibility,
-    ]);
+    const key = `${schoolIdByResponsibilityId.get(responsibility.id) ?? "household"}:${responsibility.title.toLocaleLowerCase("en-GB")}`;
+    responsibilitiesByTitle.set(key, [...(responsibilitiesByTitle.get(key) ?? []), responsibility]);
   }
 
   for (const matchingResponsibilities of responsibilitiesByTitle.values()) {

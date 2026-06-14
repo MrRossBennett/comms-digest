@@ -16,6 +16,8 @@ export const schoolCommunicationSchema = z
   .object({
     id: z.uuid(),
     kind: z.enum(["email"]),
+    schoolId: z.uuid().nullable().optional(),
+    sourceChildIds: z.array(z.uuid()).optional(),
     receivedAt: z.iso.datetime({ offset: true }),
     householdTimezone: ianaTimezoneSchema,
     subject: z.string().min(1).optional(),

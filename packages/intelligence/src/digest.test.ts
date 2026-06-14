@@ -1,6 +1,7 @@
 import { expect, test } from "vite-plus/test";
 
 import { composeDigest } from "./digest";
+import { reconcileDigest } from "./reconcile";
 import { multiCommunicationScenario } from "./scenario";
 
 test("reconciles several School Communications into one household-specific Digest", () => {
@@ -33,6 +34,121 @@ test("reconciles several School Communications into one household-specific Diges
   );
   expect(surfacedClaims.every((claim) => claim.citations.length > 0)).toBe(true);
   expect(surfacedClaims.some((claim) => claim.audience.originalWording === "Year 6")).toBe(true);
+});
+
+test("keeps School and group audiences inside the Communication's School", () => {
+  const scenario = structuredClone(multiCommunicationScenario);
+  const riversideId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97d01";
+  const hillcrestId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97d02";
+
+  scenario.household.children = [
+    {
+      id: scenario.household.children[0]!.id,
+      name: "Alex",
+      schoolYear: "Year 4",
+      schoolId: riversideId,
+    },
+    {
+      id: scenario.household.children[1]!.id,
+      name: "Sam",
+      schoolYear: "Year 6",
+      schoolId: hillcrestId,
+    },
+    {
+      id: "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97d03",
+      name: "Jo",
+      schoolYear: "Year 6",
+      schoolId: riversideId,
+    },
+  ];
+
+  for (const extraction of scenario.extractions) {
+    extraction.communication.schoolId =
+      extraction.communication.subject?.includes("Year 6") ||
+      extraction.communication.subject?.includes("Museum")
+        ? hillcrestId
+        : riversideId;
+  }
+
+  const digest = composeDigest(scenario);
+  const year6Item = digest.goodToKnow.find(({ title }) => title.includes("disco"));
+
+  expect(year6Item?.childIds).toEqual([scenario.household.children[1]!.id]);
+});
+
+test("does not widen a Child-scoped Communication Source", () => {
+  const scenario = structuredClone(multiCommunicationScenario);
+  const schoolId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97d11";
+  const samId = scenario.household.children[1]!.id;
+
+  scenario.household.children = [
+    {
+      id: scenario.household.children[0]!.id,
+      name: "Alex",
+      schoolYear: "Year 4",
+      schoolId,
+    },
+    {
+      id: samId,
+      name: "Sam",
+      schoolYear: "Year 6",
+      schoolId,
+    },
+    {
+      id: "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97d12",
+      name: "Jo",
+      schoolYear: "Year 6",
+      schoolId,
+    },
+  ];
+
+  for (const extraction of scenario.extractions) {
+    extraction.communication.schoolId = schoolId;
+    extraction.communication.sourceChildIds = [samId];
+  }
+
+  const digest = composeDigest(scenario);
+  const year6Item = digest.goodToKnow.find(({ title }) => title.includes("disco"));
+
+  expect(year6Item?.childIds).toEqual([samId]);
+});
+
+test("does not reconcile matching topics across Schools", () => {
+  const scenario = structuredClone(multiCommunicationScenario);
+  const riversideId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97d21";
+  const hillcrestId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97d22";
+
+  scenario.household.children = [
+    {
+      id: scenario.household.children[0]!.id,
+      name: "Alex",
+      schoolYear: "Year 4",
+      schoolId: riversideId,
+    },
+    {
+      id: scenario.household.children[1]!.id,
+      name: "Sam",
+      schoolYear: "Year 6",
+      schoolId: hillcrestId,
+    },
+  ];
+
+  for (const extraction of scenario.extractions) {
+    extraction.communication.schoolId = extraction.communication.subject?.includes("cancelled")
+      ? hillcrestId
+      : riversideId;
+  }
+
+  const reconciliation = reconcileDigest({
+    household: scenario.household,
+    extractions: scenario.extractions,
+  });
+
+  expect(
+    reconciliation.items.some(
+      ({ section, title }) => section === "act_now" && title.includes("Pay £12"),
+    ),
+  ).toBe(true);
 });
 
 test("fails closed when reconciliation references an unknown Claim", () => {

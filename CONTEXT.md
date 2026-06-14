@@ -27,6 +27,7 @@ _Avoid_: Institution, organisation, provider
 
 **School Communication**:
 A message or document issued by a school or school-related service that may contain information or responsibilities relevant to one or more **Children**.
+Once fetched from a confirmed **Communication Source**, its source text is stored as an immutable snapshot. Its School and selected-Child boundary is inherited from **Source Review** and cannot be widened by extraction or reconciliation.
 _Avoid_: Correspondence, content, document
 
 **Communication Source**:
@@ -41,6 +42,7 @@ _Avoid_: Inbox setup, sender configuration
 
 **Digest**:
 A prioritised view of relevant information and responsibilities derived from **School Communications** for a **Household**. It is organised into **Act Now**, **Coming Up**, and **Good to Know**.
+The first version is refreshed manually. Repeated fetches skip already-seen external message identifiers and rebuild one combined **Digest** from the Household's stored evidence.
 _Avoid_: Summary, feed, newsletter
 
 **Act Now**:
