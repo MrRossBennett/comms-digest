@@ -40,9 +40,19 @@ export async function getSourceReviewForOwner(ownerUserId: string) {
   if (!householdSetup) return null;
 
   const googleAccounts = await db
-    .select({ scope: account.scope })
+    .select({
+      scope: account.scope,
+      refreshToken: account.refreshToken,
+      accessTokenExpiresAt: account.accessTokenExpiresAt,
+    })
     .from(account)
     .where(and(eq(account.userId, ownerUserId), eq(account.providerId, "google")));
+  const gmailAccount = googleAccounts.find(({ scope }) => hasGmailReadonlyScope(scope));
+  const gmailNeedsReconnect =
+    gmailAccount?.accessTokenExpiresAt !== null &&
+    gmailAccount?.accessTokenExpiresAt !== undefined &&
+    gmailAccount.accessTokenExpiresAt <= new Date() &&
+    !gmailAccount.refreshToken;
 
   const sources = await db
     .select({
@@ -78,7 +88,8 @@ export async function getSourceReviewForOwner(ownerUserId: string) {
 
   return {
     household: householdSetup,
-    gmailConnected: googleAccounts.some(({ scope }) => hasGmailReadonlyScope(scope)),
+    gmailConnected: Boolean(gmailAccount) && !gmailNeedsReconnect,
+    gmailNeedsReconnect,
     sources: sources.map((source) => ({
       ...source,
       childIds: selectedChildren

@@ -19,6 +19,7 @@ import {
 import { Fragment } from "react";
 import { toast } from "sonner";
 
+import { getErrorMessage } from "#/lib/error-message";
 import {
   $fetchNewCommunications,
   $getHouseholdDigest,
@@ -49,7 +50,7 @@ function HouseholdHome() {
       );
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Communications could not be fetched.");
+      toast.error(getErrorMessage(error, "Communications could not be fetched."));
     },
   });
   const statusMutation = useMutation({
@@ -111,6 +112,11 @@ function HouseholdHome() {
           </Button>
         </div>
       </div>
+      {fetchMutation.error ? (
+        <p role="alert" className="-mt-6 mb-8 text-sm text-destructive">
+          {getErrorMessage(fetchMutation.error, "Communications could not be fetched.")}
+        </p>
+      ) : null}
 
       {digestData?.digest ? (
         <HouseholdDigest

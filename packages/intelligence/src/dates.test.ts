@@ -2,32 +2,42 @@ import { expect, test } from "vite-plus/test";
 
 import { resolveRelativeDate } from "./dates";
 
-test("resolves weekday wording from the School Communication timestamp and Household timezone", () => {
-  expect(resolveRelativeDate("Friday", "2026-01-12T23:30:00.000Z", "Europe/London")).toEqual({
-    originalWording: "Friday",
-    resolvedDate: "2026-01-16",
-  });
+const receivedAt = "2026-06-14T09:00:00.000Z";
+const timezone = "Europe/London";
 
-  expect(resolveRelativeDate("next Monday", "2026-01-12T23:30:00.000Z", "Europe/London")).toEqual({
-    originalWording: "next Monday",
-    resolvedDate: "2026-01-19",
+test.each([
+  ["this Monday 15th June", "2026-06-15"],
+  ["next Wednesday 17th June", "2026-06-17"],
+  ["Tuesday 16th June", "2026-06-16"],
+  ["Monday 15 June", "2026-06-15"],
+  ["15th June", "2026-06-15"],
+  ["15/06/2026", "2026-06-15"],
+  ["tomorrow", "2026-06-15"],
+  ["next Monday", "2026-06-15"],
+  ["this Monday", "2026-06-15"],
+  ["Monday", "2026-06-15"],
+])('resolves UK school date wording "%s"', (wording, resolvedDate) => {
+  expect(resolveRelativeDate(wording, receivedAt, timezone)).toEqual({
+    originalWording: wording,
+    resolvedDate,
   });
 });
 
-test("preserves ambiguous date wording without guessing a date", () => {
-  expect(
-    resolveRelativeDate("near the end of term", "2026-01-12T23:30:00.000Z", "Europe/London"),
-  ).toEqual({
-    originalWording: "near the end of term",
+test("uses the School Communication timestamp in the Household timezone", () => {
+  expect(resolveRelativeDate("tomorrow", "2026-06-14T23:30:00.000Z", "Europe/London")).toEqual({
+    originalWording: "tomorrow",
+    resolvedDate: "2026-06-16",
+  });
+});
+
+test.each([
+  "near the end of term",
+  "Wednesday 18th June",
+  "Monday and Tuesday",
+  "Please return this Monday",
+])('preserves unverifiable date wording "%s" without guessing', (wording) => {
+  expect(resolveRelativeDate(wording, receivedAt, timezone)).toEqual({
+    originalWording: wording,
     resolvedDate: null,
-  });
-});
-
-test("resolves a stated day and month using the communication year", () => {
-  expect(
-    resolveRelativeDate("Monday 19 January", "2026-01-12T23:30:00.000Z", "Europe/London"),
-  ).toEqual({
-    originalWording: "Monday 19 January",
-    resolvedDate: "2026-01-19",
   });
 });

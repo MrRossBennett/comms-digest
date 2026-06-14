@@ -30,29 +30,47 @@ export function alignExtractionCitations(
   sourceText: string,
   extraction: ModelExtraction,
 ): ModelExtraction {
+  const normalizedSource = normalizeWhitespaceWithOffsets(sourceText);
+
   return {
     ...extraction,
     claims: extraction.claims.map((claim) => ({
       ...claim,
       citations: claim.citations.map((citation) => {
-        const occurrences: number[] = [];
-        for (
-          let index = sourceText.indexOf(citation.quote);
-          index !== -1;
-          index = sourceText.indexOf(citation.quote, index + 1)
-        ) {
-          occurrences.push(index);
+        const exactOccurrences = findOccurrences(sourceText, citation.quote);
+        if (exactOccurrences.length > 0) {
+          const start = nearestOccurrence(exactOccurrences, citation.start);
+          return { ...citation, start, end: start + citation.quote.length };
         }
 
-        if (occurrences.length === 0) {
+        const normalizedQuote = normalizeWhitespace(citation.quote);
+        if (!normalizedQuote) {
           return citation;
         }
 
-        const start = occurrences.reduce((best, candidate) =>
-          Math.abs(candidate - citation.start) < Math.abs(best - citation.start) ? candidate : best,
+        const normalizedOccurrences = findOccurrences(normalizedSource.text, normalizedQuote)
+          .map((index) => {
+            const start = normalizedSource.starts[index];
+            const end = normalizedSource.ends[index + normalizedQuote.length - 1];
+            return start === undefined || end === undefined ? undefined : { start, end };
+          })
+          .filter((occurrence) => occurrence !== undefined);
+        if (normalizedOccurrences.length === 0) {
+          return citation;
+        }
+
+        const occurrence = normalizedOccurrences.reduce((best, candidate) =>
+          Math.abs(candidate.start - citation.start) < Math.abs(best.start - citation.start)
+            ? candidate
+            : best,
         );
 
-        return { ...citation, start, end: start + citation.quote.length };
+        return {
+          ...citation,
+          quote: sourceText.slice(occurrence.start, occurrence.end),
+          start: occurrence.start,
+          end: occurrence.end,
+        };
       }),
     })),
   };
@@ -64,38 +82,54 @@ export function validateAndIdentifyExtraction(
   createId = uuidv7,
 ) {
   const communication = schoolCommunicationSchema.parse(communicationInput);
-  const extraction = modelExtractionSchema.parse(extractionInput);
+  const modelExtraction = alignExtractionCitations(
+    communication.sourceText,
+    modelExtractionSchema.parse(extractionInput),
+  );
+  const claimPositionMap = new Map<number, number>();
+  const groundedClaims = modelExtraction.claims.flatMap((claim, originalPosition) => {
+    const citations = claim.citations.filter((citation) =>
+      citationIdentifiesExactQuote(communication.sourceText, citation),
+    );
+    if (citations.length === 0) return [];
 
-  for (const claim of extraction.claims) {
-    for (const citation of claim.citations) {
-      const passage = communication.sourceText.slice(citation.start, citation.end);
-      if (passage !== citation.quote) {
-        throw new GroundingError(
-          `Citation offsets ${citation.start}:${citation.end} do not identify the exact quote`,
-        );
-      }
-    }
+    claimPositionMap.set(originalPosition, claimPositionMap.size);
+    return [{ ...claim, citations }];
+  });
+  const extraction = {
+    ...modelExtraction,
+    claims: groundedClaims.map((claim) => ({
+      ...claim,
+      date: claim.date
+        ? normalizeResolvedDate(
+            claim.date,
+            communication.receivedAt,
+            communication.householdTimezone,
+          )
+        : undefined,
+    })),
+    responsibilities: modelExtraction.responsibilities.flatMap((responsibility) => {
+      const claimPositions = responsibility.claimPositions.flatMap((position) => {
+        const mappedPosition = claimPositionMap.get(position);
+        return mappedPosition === undefined ? [] : [mappedPosition];
+      });
+      if (claimPositions.length === 0) return [];
 
-    if (claim.date) {
-      verifyResolvedDate(claim.date, communication.receivedAt, communication.householdTimezone);
-    }
-  }
-
-  for (const responsibility of extraction.responsibilities) {
-    if (responsibility.dueDate) {
-      verifyResolvedDate(
-        responsibility.dueDate,
-        communication.receivedAt,
-        communication.householdTimezone,
-      );
-    }
-
-    for (const position of responsibility.claimPositions) {
-      if (!extraction.claims[position]) {
-        throw new GroundingError(`Responsibility references missing Claim position ${position}`);
-      }
-    }
-  }
+      return [
+        {
+          ...responsibility,
+          claimPositions,
+          dueDate: responsibility.dueDate
+            ? normalizeResolvedDate(
+                responsibility.dueDate,
+                communication.receivedAt,
+                communication.householdTimezone,
+              )
+            : undefined,
+        },
+      ];
+    }),
+  };
 
   const claims = extraction.claims.map((claim) => {
     const citations = claim.citations.map((citation) => ({
@@ -132,15 +166,59 @@ export function validateAndIdentifyExtraction(
   });
 }
 
-function verifyResolvedDate(
-  date: { originalWording: string; resolvedDate: string | null },
+function normalizeResolvedDate(
+  date: { originalWording: string },
   receivedAt: string,
   householdTimezone: string,
 ) {
-  const expected = resolveRelativeDate(date.originalWording, receivedAt, householdTimezone);
-  if (date.resolvedDate !== expected.resolvedDate) {
-    throw new GroundingError(
-      `Resolved date for "${date.originalWording}" is not supported by the School Communication timestamp`,
-    );
+  return resolveRelativeDate(date.originalWording, receivedAt, householdTimezone);
+}
+
+function citationIdentifiesExactQuote(
+  sourceText: string,
+  citation: { quote: string; start: number; end: number },
+) {
+  return sourceText.slice(citation.start, citation.end) === citation.quote;
+}
+
+function findOccurrences(text: string, search: string) {
+  const occurrences: number[] = [];
+  for (let index = text.indexOf(search); index !== -1; index = text.indexOf(search, index + 1)) {
+    occurrences.push(index);
   }
+  return occurrences;
+}
+
+function nearestOccurrence(occurrences: number[], hint: number) {
+  return occurrences.reduce((best, candidate) =>
+    Math.abs(candidate - hint) < Math.abs(best - hint) ? candidate : best,
+  );
+}
+
+function normalizeWhitespace(text: string) {
+  return text.trim().replace(/\s+/gu, " ");
+}
+
+function normalizeWhitespaceWithOffsets(text: string) {
+  let normalized = "";
+  const starts: number[] = [];
+  const ends: number[] = [];
+
+  for (let index = 0; index < text.length; ) {
+    if (/\s/u.test(text[index] ?? "")) {
+      const start = index;
+      while (index < text.length && /\s/u.test(text[index] ?? "")) index += 1;
+      normalized += " ";
+      starts.push(start);
+      ends.push(index);
+      continue;
+    }
+
+    normalized += text[index];
+    starts.push(index);
+    index += 1;
+    ends.push(index);
+  }
+
+  return { text: normalized, starts, ends };
 }

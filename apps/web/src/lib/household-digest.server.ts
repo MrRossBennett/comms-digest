@@ -28,6 +28,7 @@ import { createLiveExtractor } from "@repo/intelligence/live";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
+import { getErrorMessage } from "./error-message";
 import { gmailRequest } from "./gmail";
 import { getHouseholdForOwner } from "./household.server";
 import { limitGmailSourceText, selectNewGmailMessages } from "./ingestion-limits";
@@ -107,14 +108,34 @@ export async function fetchNewCommunicationsForOwner(ownerUserId: string) {
     ({ externalMessageId }) => !existing.has(externalMessageId),
   );
 
+  let importedCount = 0;
+  let ingestionError: unknown;
   for (const candidate of newCandidates) {
-    await ingestCandidate(householdSetup.id, candidate);
+    try {
+      await ingestCandidate(householdSetup.id, candidate);
+      importedCount += 1;
+    } catch (error) {
+      ingestionError = error;
+      break;
+    }
   }
 
   await rebuildHouseholdDigest(householdSetup.id, householdSetup);
 
+  if (ingestionError) {
+    const detail = getErrorMessage(
+      ingestionError,
+      "A communication could not be processed by the extraction service.",
+    );
+    throw new Error(
+      importedCount === 0
+        ? detail
+        : `Added ${importedCount} ${importedCount === 1 ? "communication" : "communications"}, then stopped: ${detail}`,
+    );
+  }
+
   return {
-    importedCount: newCandidates.length,
+    importedCount,
     digest: await getHouseholdDigestForOwner(ownerUserId),
   };
 }
@@ -302,13 +323,24 @@ async function fetchGmailCandidates(
   sources: ConfirmedSource[],
 ) {
   const [googleAccount] = await db
-    .select({ scope: account.scope })
+    .select({
+      scope: account.scope,
+      refreshToken: account.refreshToken,
+      accessTokenExpiresAt: account.accessTokenExpiresAt,
+    })
     .from(account)
     .where(and(eq(account.userId, ownerUserId), eq(account.providerId, "google")))
     .limit(1);
 
   if (!googleAccount?.scope?.includes("https://www.googleapis.com/auth/gmail.readonly")) {
     throw new Error("Reconnect Gmail with read-only access before fetching communications");
+  }
+  if (
+    googleAccount.accessTokenExpiresAt &&
+    googleAccount.accessTokenExpiresAt <= new Date() &&
+    !googleAccount.refreshToken
+  ) {
+    throw new Error("Your Gmail connection has expired. Reconnect Gmail from Sources.");
   }
 
   const { accessToken } = await auth.api.getAccessToken({
