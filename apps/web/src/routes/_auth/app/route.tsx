@@ -12,7 +12,14 @@ import {
 } from "@repo/ui/components/dropdown-menu";
 import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, useRouter } from "@tanstack/react-router";
-import { HomeIcon, LogOutIcon, MailIcon, SparklesIcon, UserIcon } from "lucide-react";
+import {
+  HomeIcon,
+  LogOutIcon,
+  MailIcon,
+  MessageCircleIcon,
+  SparklesIcon,
+  UserIcon,
+} from "lucide-react";
 
 import { ThemeToggle } from "#/components/theme-toggle";
 
@@ -35,6 +42,15 @@ function AppLayout() {
               <Button variant="ghost" size="sm" render={<Link to="/app" />} nativeButton={false}>
                 <HomeIcon />
                 Household
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                render={<Link to="/app/chat" />}
+                nativeButton={false}
+              >
+                <MessageCircleIcon />
+                Chat
               </Button>
               <Button
                 variant="ghost"

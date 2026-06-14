@@ -9,6 +9,7 @@
     "ui": "vpx shadcn@latest"
   },
   "dependencies": {
+    "@ai-sdk/react": "catalog:",
     "@fontsource-variable/inter": "catalog:",
     "@icons-pack/react-simple-icons": "catalog:",
     "@repo/auth": "workspace:*",
@@ -20,6 +21,7 @@
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-router-ssr-query": "catalog:",
     "@tanstack/react-start": "catalog:",
+    "ai": "catalog:",
     "date-fns": "catalog:",
     "drizzle-orm": "catalog:",
     "lucide-react": "catalog:",
