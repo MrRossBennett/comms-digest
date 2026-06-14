@@ -7,6 +7,7 @@ const childSchema = z
     id: z.uuid(),
     name: z.string().min(1),
     schoolYear: z.string().min(1),
+    schoolId: z.uuid().optional(),
   })
   .strict();
 
@@ -61,14 +62,28 @@ const composeDigestInputSchema = z
 function relevantChildIds(
   audience: z.infer<typeof claimSchema>["audience"],
   household: z.infer<typeof householdDigestConfigSchema>,
+  schoolId?: string | null,
+  sourceChildIds?: string[],
 ) {
-  if (audience.scope === "school" || audience.scope === "household") {
-    return household.children.map(({ id }) => id);
+  const sourceChildren =
+    schoolId === undefined || schoolId === null
+      ? household.children
+      : household.children.filter((child) => child.schoolId === schoolId);
+  const eligibleChildren = sourceChildIds
+    ? sourceChildren.filter((child) => sourceChildIds.includes(child.id))
+    : sourceChildren;
+
+  if (audience.scope === "household") {
+    return (sourceChildIds ? eligibleChildren : household.children).map(({ id }) => id);
+  }
+
+  if (audience.scope === "school") {
+    return eligibleChildren.map(({ id }) => id);
   }
 
   const wording = audience.originalWording.toLocaleLowerCase("en-GB");
 
-  return household.children
+  return eligibleChildren
     .filter((child) => {
       if (audience.scope === "child") {
         return wording.includes(child.name.toLocaleLowerCase("en-GB"));
@@ -91,6 +106,17 @@ export function composeDigest(input: unknown) {
       .flatMap(({ responsibilities }) => responsibilities)
       .map((responsibility) => [responsibility.id, responsibility]),
   );
+  const communicationScopeByClaimId = new Map(
+    extractions.flatMap(({ communication, claims: communicationClaims }) =>
+      communicationClaims.map((claim) => [
+        claim.id,
+        {
+          schoolId: communication.schoolId,
+          sourceChildIds: communication.sourceChildIds,
+        },
+      ]),
+    ),
+  );
 
   const items = reconciliation.items.flatMap((item) => {
     const itemClaims = item.claimIds.map((claimId) => {
@@ -101,7 +127,16 @@ export function composeDigest(input: unknown) {
       return claim;
     });
     const childIds = [
-      ...new Set(itemClaims.flatMap((claim) => relevantChildIds(claim.audience, household))),
+      ...new Set(
+        itemClaims.flatMap((claim) =>
+          relevantChildIds(
+            claim.audience,
+            household,
+            communicationScopeByClaimId.get(claim.id)?.schoolId,
+            communicationScopeByClaimId.get(claim.id)?.sourceChildIds,
+          ),
+        ),
+      ),
     ];
 
     if (childIds.length === 0) {
