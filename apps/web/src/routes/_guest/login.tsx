@@ -107,17 +107,13 @@ function SignInForm() {
             <span className="relative z-10 bg-background px-2 text-muted-foreground">Or</span>
           </div>
           <ContinueWithGoogleButton callbackURL={redirectUrl} disabled={mutation.isPending} />
-          <p className="text-center text-xs leading-5 text-muted-foreground">
-            Google signs you into Comms Digest. Connecting a Gmail inbox happens later and is
-            optional.
-          </p>
         </div>
       </form>
 
       <div className="text-center text-sm">
-        New to Comms Digest?{" "}
+        Don&apos;t have an account?{" "}
         <Link to="/signup" className="underline underline-offset-4">
-          Create an account
+          Sign up
         </Link>
       </div>
     </div>

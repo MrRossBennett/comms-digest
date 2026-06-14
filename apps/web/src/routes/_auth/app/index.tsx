@@ -96,7 +96,7 @@ function HouseholdHome() {
             )}
             Fetch new communications
           </Button>
-          <Button variant="outline" render={<Link to="/app/sources" />}>
+          <Button variant="outline" render={<Link to="/app/sources" />} nativeButton={false}>
             <Settings2Icon />
             Sources
           </Button>
@@ -105,6 +105,7 @@ function HouseholdHome() {
             size="icon"
             aria-label="Edit Household"
             render={<Link to="/app/onboarding" />}
+            nativeButton={false}
           >
             <PencilIcon />
           </Button>
@@ -147,7 +148,7 @@ function EmptyDigest() {
             </p>
           </div>
         </div>
-        <Button variant="outline" render={<Link to="/app/sources" />}>
+        <Button variant="outline" render={<Link to="/app/sources" />} nativeButton={false}>
           <Settings2Icon />
           Review Sources
         </Button>

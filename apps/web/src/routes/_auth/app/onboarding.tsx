@@ -83,7 +83,12 @@ function HouseholdOnboarding() {
   return (
     <main className="mx-auto w-full max-w-3xl px-5 py-10 sm:px-8 sm:py-14">
       {existingHousehold ? (
-        <Button variant="ghost" className="mb-6 -ml-3" render={<Link to="/app" />}>
+        <Button
+          variant="ghost"
+          className="mb-6 -ml-3"
+          render={<Link to="/app" />}
+          nativeButton={false}
+        >
           <ArrowLeftIcon />
           Back to Household
         </Button>
@@ -110,7 +115,7 @@ function HouseholdOnboarding() {
                 Schools
               </h2>
               <p className="text-sm text-muted-foreground">
-                Add every School attended by a Child in this Household.
+                Add every School attended by a Student in this Household.
               </p>
             </div>
             <Button
@@ -188,7 +193,7 @@ function HouseholdOnboarding() {
           <div className="mb-3 flex items-end justify-between gap-4">
             <div>
               <h2 id="household-children-heading" className="font-semibold tracking-tight">
-                Children
+                Students
               </h2>
               <p className="text-sm text-muted-foreground">
                 Class is optional because most communications are year-based.
@@ -213,7 +218,7 @@ function HouseholdOnboarding() {
               }
             >
               <PlusIcon />
-              Add Child
+              Add Student
             </Button>
           </div>
 
@@ -224,7 +229,7 @@ function HouseholdOnboarding() {
                 className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6"
                 disabled={saveMutation.isPending}
               >
-                <legend className="sr-only">Child {index + 1}</legend>
+                <legend className="sr-only">Student {index + 1}</legend>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="grid gap-2">
                     <Label htmlFor={`child-${index}-name`}>Name</Label>
@@ -287,7 +292,7 @@ function HouseholdOnboarding() {
                       }
                     >
                       <Trash2Icon />
-                      Remove Child
+                      Remove Student
                     </Button>
                   </div>
                 </div>
@@ -297,7 +302,7 @@ function HouseholdOnboarding() {
         </section>
 
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
-          <Button variant="ghost" render={<Link to="/app/demo" />}>
+          <Button variant="ghost" render={<Link to="/app/demo" />} nativeButton={false}>
             Preview Demo Household
           </Button>
           <Button type="submit" size="lg" disabled={saveMutation.isPending}>

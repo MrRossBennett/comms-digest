@@ -1,9 +1,13 @@
-import { expect, test } from "vite-plus/test";
+import { expect, test, vi } from "vite-plus/test";
 
 import { year4SwimmingFixture } from "./fixtures";
-import { createLiveExtractor } from "./live";
+import { createLiveExtractor, MAX_EXTRACTION_OUTPUT_TOKENS } from "./live";
 
 test("uses configured model extraction and records reproducibility metadata", async () => {
+  const generate = vi.fn().mockResolvedValue({
+    output: year4SwimmingFixture.expected,
+    usage: { inputTokens: 1_000, outputTokens: 200, totalTokens: 1_200 },
+  });
   const live = createLiveExtractor(
     {
       provider: "anthropic",
@@ -11,10 +15,7 @@ test("uses configured model extraction and records reproducibility metadata", as
       promptVersion: "school-extraction-v1",
     },
     {
-      generate: async () => ({
-        output: year4SwimmingFixture.expected,
-        usage: { inputTokens: 1_000, outputTokens: 200, totalTokens: 1_200 },
-      }),
+      generate,
     },
   );
 
@@ -30,6 +31,11 @@ test("uses configured model extraction and records reproducibility metadata", as
     totalTokens: 1_200,
     estimatedCostUsd: 0.002,
   });
+  expect(generate).toHaveBeenCalledWith(
+    expect.objectContaining({
+      maxOutputTokens: MAX_EXTRACTION_OUTPUT_TOKENS,
+    }),
+  );
 });
 
 test("re-derives citation offsets from the model's verbatim quote", async () => {

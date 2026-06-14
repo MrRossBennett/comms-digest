@@ -49,6 +49,11 @@ describe("Communication Source Review", () => {
     expect(
       hasGmailReadonlyScope("openid email https://www.googleapis.com/auth/gmail.readonly profile"),
     ).toBe(true);
+    expect(
+      hasGmailReadonlyScope(
+        "https://www.googleapis.com/auth/gmail.readonly,https://www.googleapis.com/auth/userinfo.email,openid",
+      ),
+    ).toBe(true);
     expect(hasGmailReadonlyScope("openid email profile")).toBe(false);
   });
 });

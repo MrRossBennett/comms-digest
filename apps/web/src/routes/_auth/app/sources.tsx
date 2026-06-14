@@ -81,7 +81,12 @@ function SourceReviewPage() {
 
   return (
     <main className="mx-auto w-full max-w-5xl px-5 py-10 sm:px-8 sm:py-14">
-      <Button variant="ghost" className="mb-6 -ml-3" render={<Link to="/app" />}>
+      <Button
+        variant="ghost"
+        className="mb-6 -ml-3"
+        render={<Link to="/app" />}
+        nativeButton={false}
+      >
         <ArrowLeftIcon />
         Back to Household
       </Button>
@@ -144,25 +149,33 @@ function SourceReviewPage() {
                 <InboxIcon className="size-4" />
               </div>
               <div>
-                <h2 className="font-semibold tracking-tight">No suggested sources yet</h2>
+                <h2 className="font-semibold tracking-tight">
+                  {sourceReview.gmailConnected
+                    ? "No sources found yet"
+                    : "No suggested sources yet"}
+                </h2>
                 <p className="mt-1 max-w-xl text-sm leading-6 text-muted-foreground">
-                  Try the workflow with synthetic senders, or connect Gmail and run a scan.
+                  {sourceReview.gmailConnected
+                    ? "Run a Gmail scan to find recurring school senders."
+                    : "Try the workflow with synthetic senders, or connect Gmail and run a scan."}
                 </p>
               </div>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={discoveryMutation.isPending}
-              onClick={() => discoveryMutation.mutate("sample")}
-            >
-              {discoveryMutation.isPending && discoveryMutation.variables === "sample" ? (
-                <LoaderCircleIcon className="animate-spin" />
-              ) : (
-                <TestTube2Icon />
-              )}
-              Use sample sources
-            </Button>
+            {sourceReview.gmailConnected ? null : (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={discoveryMutation.isPending}
+                onClick={() => discoveryMutation.mutate("sample")}
+              >
+                {discoveryMutation.isPending && discoveryMutation.variables === "sample" ? (
+                  <LoaderCircleIcon className="animate-spin" />
+                ) : (
+                  <TestTube2Icon />
+                )}
+                Use sample sources
+              </Button>
+            )}
           </div>
         </section>
       ) : (
@@ -332,7 +345,7 @@ function SourceCard({
             >
               <option value="household">Whole Household</option>
               <option value="school">Everyone at one School</option>
-              <option value="children">Specific Children</option>
+              <option value="children">Specific Students</option>
             </select>
           </div>
 
@@ -359,7 +372,7 @@ function SourceCard({
 
           {audience === "children" ? (
             <div className="sm:col-span-2">
-              <p className="mb-2 text-sm font-medium">Children</p>
+              <p className="mb-2 text-sm font-medium">Students</p>
               <div className="flex flex-wrap gap-2">
                 {schoolChildren.map((householdChild) => {
                   const selected = childIds.includes(householdChild.id);
