@@ -2,6 +2,7 @@ import { expect, test } from "vite-plus/test";
 
 import {
   CHAT_REFUSAL,
+  chatRetrievalQuery,
   latestUserQuestion,
   selectChatEvidence,
   type GroundedChatEvidence,
@@ -51,6 +52,33 @@ test("returns no evidence for an unrelated unsupported question", () => {
   expect(CHAT_REFUSAL).toContain("stored school communications");
 });
 
+test("drops weak partial matches when one source strongly matches the question", () => {
+  expect(selectChatEvidence("When is the Summer Concert?", evidence).map(({ id }) => id)).toEqual(
+    [],
+  );
+
+  const summerEvidence = [
+    {
+      ...evidence[0]!,
+      id: "concert",
+      claim: "The Summer Concert is on Thursday.",
+      subject: "Summer Concert",
+      citation: "Summer Concert on Thursday.",
+    },
+    {
+      ...evidence[1]!,
+      id: "festival",
+      claim: "The summer festival is approaching.",
+      subject: "Summer Festival",
+      citation: "The summer festival is approaching.",
+    },
+  ];
+
+  expect(
+    selectChatEvidence("When is the Summer Concert?", summerEvidence).map(({ id }) => id),
+  ).toEqual(["concert"]);
+});
+
 test("reads the latest user text from AI SDK messages", () => {
   const messages: GroundedChatMessage[] = [
     { id: "1", role: "user", parts: [{ type: "text", text: "First question" }] },
@@ -59,4 +87,22 @@ test("reads the latest user text from AI SDK messages", () => {
   ];
 
   expect(latestUserQuestion(messages)).toBe("Latest question");
+});
+
+test("uses the previous user question to retrieve evidence for a pronoun follow-up", () => {
+  const messages: GroundedChatMessage[] = [
+    {
+      id: "1",
+      role: "user",
+      parts: [{ type: "text", text: "When is the Summer Concert?" }],
+    },
+    {
+      id: "2",
+      role: "assistant",
+      parts: [{ type: "text", text: "It is on Thursday." }],
+    },
+    { id: "3", role: "user", parts: [{ type: "text", text: "Where is it?" }] },
+  ];
+
+  expect(chatRetrievalQuery(messages)).toBe("When is the Summer Concert?\nWhere is it?");
 });

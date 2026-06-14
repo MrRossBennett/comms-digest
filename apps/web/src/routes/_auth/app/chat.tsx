@@ -81,8 +81,8 @@ function ChatPage() {
                 title="Ask about your school communications"
                 description="I’ll answer from stored, cited information and say when it isn’t there."
               >
-                <div className="space-y-5">
-                  <div className="mx-auto rounded-full bg-muted p-3 text-muted-foreground">
+                <div className="w-full min-w-0 space-y-5 overflow-hidden">
+                  <div className="mx-auto w-fit rounded-full bg-muted p-3 text-muted-foreground">
                     <MessageCircleIcon className="size-6" />
                   </div>
                   <div className="space-y-1">
@@ -91,7 +91,7 @@ function ChatPage() {
                       I’ll answer from stored, cited information and say when it isn’t there.
                     </p>
                   </div>
-                  <Suggestions>
+                  <Suggestions className="w-full flex-wrap justify-center px-1 whitespace-normal">
                     {suggestions.map((suggestion) => (
                       <Suggestion key={suggestion} suggestion={suggestion} onClick={ask} />
                     ))}

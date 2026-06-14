@@ -16,6 +16,7 @@ import {
   HomeIcon,
   LogOutIcon,
   MailIcon,
+  MenuIcon,
   MessageCircleIcon,
   SparklesIcon,
   UserIcon,
@@ -38,6 +39,7 @@ function AppLayout() {
             <p className="font-semibold tracking-tight">Comms Digest</p>
           </div>
           <div className="flex items-center gap-2">
+            <MobileNavigation />
             <nav className="hidden items-center gap-1 sm:flex" aria-label="Main navigation">
               <Button variant="ghost" size="sm" render={<Link to="/app" />} nativeButton={false}>
                 <HomeIcon />
@@ -78,6 +80,43 @@ function AppLayout() {
       </header>
       <Outlet />
     </div>
+  );
+}
+
+function MobileNavigation() {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            variant="outline"
+            size="icon"
+            className="sm:hidden"
+            aria-label="Open navigation"
+          />
+        }
+      >
+        <MenuIcon />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48 sm:hidden">
+        <DropdownMenuItem render={<Link to="/app" />}>
+          <HomeIcon />
+          Household
+        </DropdownMenuItem>
+        <DropdownMenuItem render={<Link to="/app/chat" />}>
+          <MessageCircleIcon />
+          Chat
+        </DropdownMenuItem>
+        <DropdownMenuItem render={<Link to="/app/demo" />}>
+          <SparklesIcon />
+          Demo
+        </DropdownMenuItem>
+        <DropdownMenuItem render={<Link to="/app/sources" />}>
+          <MailIcon />
+          Sources
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
