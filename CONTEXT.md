@@ -43,6 +43,7 @@ _Avoid_: Inbox setup, sender configuration
 **Digest**:
 A prioritised view of relevant information and responsibilities derived from **School Communications** for a **Household**. It is organised into **Act Now**, **Coming Up**, and **Good to Know**.
 The first version is refreshed manually. Repeated fetches skip already-seen external message identifiers and rebuild one combined **Digest** from the Household's stored evidence.
+The **Household Owner** may dismiss a **Digest** item that is not useful. Dismissal is stored against its underlying **Claims** and **Responsibilities**, not the generated Digest row, so it survives refreshes and can be reopened later. Newly added evidence makes a changed item visible again until the Household Owner reviews it.
 _Avoid_: Summary, feed, newsletter
 
 **Ingestion scaling boundary**:

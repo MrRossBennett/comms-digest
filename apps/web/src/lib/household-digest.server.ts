@@ -28,6 +28,7 @@ import { createLiveExtractor } from "@repo/intelligence/live";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
+import { listDismissedDigestEvidenceIds } from "./digest-item-status.server";
 import { getErrorMessage } from "./error-message";
 import { gmailRequest } from "./gmail";
 import { getHouseholdForOwner } from "./household.server";
@@ -158,6 +159,8 @@ export async function getHouseholdDigestForOwner(ownerUserId: string) {
       digest: null,
       communications: [],
       completedResponsibilityIds: [],
+      dismissedClaimIds: [],
+      dismissedResponsibilityIds: [],
     };
   }
 
@@ -174,6 +177,7 @@ export async function getHouseholdDigestForOwner(ownerUserId: string) {
     extractions,
     reconciliation: reconcileDigest({ household: householdConfig, extractions }),
   });
+  const dismissed = await listDismissedDigestEvidenceIds(ownerUserId);
 
   return {
     household: householdSetup,
@@ -181,6 +185,8 @@ export async function getHouseholdDigestForOwner(ownerUserId: string) {
     digest,
     communications: extractions.map(({ communication }) => communication),
     completedResponsibilityIds: await listCompletedResponsibilityIds(ownerUserId),
+    dismissedClaimIds: dismissed.claimIds,
+    dismissedResponsibilityIds: dismissed.responsibilityIds,
   };
 }
 
