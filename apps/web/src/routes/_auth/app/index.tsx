@@ -7,11 +7,11 @@ import {
   type ValidatedExtraction,
 } from "@repo/intelligence";
 import { Button } from "@repo/ui/components/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@repo/ui/components/dialog";
 import { useMutation } from "@tanstack/react-query";
 import { createFileRoute, Link, redirect, useRouter } from "@tanstack/react-router";
 import {
   CheckIcon,
-  ChevronDownIcon,
   FileTextIcon,
   LoaderCircleIcon,
   MailIcon,
@@ -21,6 +21,7 @@ import {
   Repeat2Icon,
   RotateCcwIcon,
   Settings2Icon,
+  ChevronDownIcon,
 } from "lucide-react";
 import { Fragment, useState } from "react";
 import { toast } from "sonner";
@@ -471,8 +472,8 @@ function DigestItem({
     .map(({ displayName }) => displayName);
 
   return (
-    <article className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-      <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6">
+    <article className="rounded-2xl border bg-card shadow-sm">
+      <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6">
         <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap gap-2">
             <span className="inline-flex rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
@@ -490,24 +491,22 @@ function DigestItem({
             Applies to {formatNames(names)}
           </p>
         </div>
-        {actions.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
-            {actions.map((action) => (
-              <Button
-                key={action.label}
-                type="button"
-                variant={action.variant}
-                disabled={action.pending}
-                onClick={action.onClick}
-              >
-                {action.pending ? <LoaderCircleIcon className="animate-spin" /> : action.icon}
-                {action.label}
-              </Button>
-            ))}
-          </div>
-        ) : null}
+        <div className="flex flex-wrap items-start gap-2">
+          <SourcesButton communications={communications} claims={item.claims} />
+          {actions.map((action) => (
+            <Button
+              key={action.label}
+              type="button"
+              variant={action.variant}
+              disabled={action.pending}
+              onClick={action.onClick}
+            >
+              {action.pending ? <LoaderCircleIcon className="animate-spin" /> : action.icon}
+              {action.label}
+            </Button>
+          ))}
+        </div>
       </div>
-      <SourceDisclosure communications={communications} claims={item.claims} />
     </article>
   );
 }
@@ -602,13 +601,14 @@ function DismissedDigestItems({
   );
 }
 
-function SourceDisclosure({
+function SourcesButton({
   communications,
   claims,
 }: {
   communications: SchoolCommunication[];
   claims: ValidatedExtraction["claims"];
 }) {
+  const [open, setOpen] = useState(false);
   const evidence = communications.flatMap((communication) => {
     const citations = claims.flatMap((claim) =>
       claim.citations.filter((citation) => citation.communicationId === communication.id),
@@ -616,31 +616,41 @@ function SourceDisclosure({
     return citations.length > 0 ? [{ communication, citations }] : [];
   });
 
+  if (evidence.length === 0) return null;
+
   return (
-    <details className="group border-t">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-medium hover:bg-muted/50 sm:px-6 [&::-webkit-details-marker]:hidden">
-        <span className="flex items-center gap-2">
-          <FileTextIcon className="size-4 text-muted-foreground" />
-          View sources
-        </span>
-        <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-open:rotate-180" />
-      </summary>
-      <div className="space-y-5 bg-muted/30 px-5 py-6 sm:px-6">
-        {evidence.map(({ communication, citations }) => (
-          <div key={communication.id} className="rounded-xl border bg-background p-4">
-            <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-              <p className="text-sm font-medium">{communication.subject}</p>
-              <time className="text-xs text-muted-foreground">
-                {formatDateTime(communication.receivedAt)}
-              </time>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="text-muted-foreground"
+        onClick={() => setOpen(true)}
+      >
+        <FileTextIcon className="size-3.5" />
+        Sources
+      </Button>
+      <DialogContent className="max-h-[85vh] w-full overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Source communications</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          {evidence.map(({ communication, citations }) => (
+            <div key={communication.id} className="rounded-xl border bg-muted/30 p-4">
+              <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+                <p className="text-sm font-medium">{communication.subject}</p>
+                <time className="text-xs text-muted-foreground">
+                  {formatDateTime(communication.receivedAt)}
+                </time>
+              </div>
+              <p className="text-sm leading-7 whitespace-pre-wrap text-muted-foreground">
+                <HighlightedSource sourceText={communication.sourceText} citations={citations} />
+              </p>
             </div>
-            <p className="text-sm leading-7 whitespace-pre-wrap text-muted-foreground">
-              <HighlightedSource sourceText={communication.sourceText} citations={citations} />
-            </p>
-          </div>
-        ))}
-      </div>
-    </details>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

@@ -1,11 +1,11 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
-import { generateText, Output } from "ai";
+import { generateText, NoObjectGeneratedError, Output } from "ai";
 import { z } from "zod";
 
 import { modelExtractionSchema, type ModelExtraction, type SchoolCommunication } from "./contracts";
 import { alignExtractionCitations } from "./grounding";
 
-export const MAX_EXTRACTION_OUTPUT_TOKENS = 2_000;
+export const MAX_EXTRACTION_OUTPUT_TOKENS = 8_000;
 
 export const liveModelConfigSchema = z.object({
   provider: z.literal("anthropic").default("anthropic"),
@@ -77,26 +77,50 @@ ${JSON.stringify(communication, null, 2)}`;
 
 async function generateWithAiSdk(request: GenerationRequest) {
   const anthropic = createAnthropic({ apiKey: request.apiKey });
-  const result = await generateText({
-    model: anthropic(request.modelId),
-    output: Output.object({
-      schema: modelExtractionSchema,
-      name: "schoolCommunicationExtraction",
-      description: "Grounded Claims and Responsibilities from one School Communication",
-    }),
-    prompt: buildPrompt(request.communication),
-    temperature: 0,
-    maxOutputTokens: request.maxOutputTokens,
-  });
+  try {
+    const result = await generateText({
+      model: anthropic(request.modelId),
+      output: Output.object({
+        schema: modelExtractionSchema,
+        name: "schoolCommunicationExtraction",
+        description: "Grounded Claims and Responsibilities from one School Communication",
+      }),
+      prompt: buildPrompt(request.communication),
+      temperature: 0,
+      maxOutputTokens: request.maxOutputTokens,
+    });
 
-  return {
-    output: result.output,
-    usage: {
-      inputTokens: result.usage.inputTokens,
-      outputTokens: result.usage.outputTokens,
-      totalTokens: result.usage.totalTokens,
-    },
-  };
+    return {
+      output: result.output,
+      usage: {
+        inputTokens: result.usage.inputTokens,
+        outputTokens: result.usage.outputTokens,
+        totalTokens: result.usage.totalTokens,
+      },
+    };
+  } catch (error) {
+    if (NoObjectGeneratedError.isInstance(error)) {
+      console.error("[extraction] NoObjectGeneratedError", {
+        finishReason: error.finishReason,
+        outputTokens: error.usage?.outputTokens,
+      });
+      if (error.text) {
+        try {
+          const parsed = JSON.parse(error.text);
+          const validation = modelExtractionSchema.safeParse(parsed);
+          if (!validation.success) {
+            console.error(
+              "[extraction] Zod errors:",
+              JSON.stringify(validation.error.issues, null, 2),
+            );
+          }
+        } catch {
+          console.error("[extraction] JSON parse failed, raw text:", error.text.slice(0, 1000));
+        }
+      }
+    }
+    throw error;
+  }
 }
 
 export function createLiveExtractor(

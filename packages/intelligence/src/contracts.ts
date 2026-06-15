@@ -33,13 +33,13 @@ export const schoolCommunicationSchema = z
 export const audienceSchema = z
   .object({
     scope: z.enum(["child", "group", "school", "household", "unresolved"]),
-    originalWording: z.string().min(1),
+    originalWording: z.string(),
   })
   .strict();
 
 export const dateReferenceSchema = z
   .object({
-    originalWording: z.string().min(1),
+    originalWording: z.string(),
     resolvedDate: z.iso.date().nullable(),
   })
   .strict();
@@ -74,7 +74,7 @@ export const modelResponsibilitySchema = z
     title: z.string().min(1),
     dueDate: dateReferenceSchema.optional(),
     amount: amountSchema.optional(),
-    claimPositions: z.array(z.int().nonnegative()).min(1),
+    claimPositions: z.array(z.int().nonnegative()),
   })
   .strict();
 

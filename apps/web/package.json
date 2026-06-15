@@ -30,6 +30,7 @@
     "react": "catalog:",
     "react-dom": "catalog:",
     "sonner": "catalog:",
+    "unpdf": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
