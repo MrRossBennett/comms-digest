@@ -44,7 +44,6 @@ export const Route = createFileRoute("/_auth/app/chat")({
 });
 
 function ChatPage() {
-  const { household } = Route.useLoaderData();
   const [input, setInput] = useState("");
   const transport = useMemo(
     () => new DefaultChatTransport<GroundedChatMessage>({ api: "/api/chat" }),
@@ -65,10 +64,9 @@ function ChatPage() {
   return (
     <main className="mx-auto flex h-[calc(100svh-4rem)] w-full max-w-5xl flex-col px-5 py-6 sm:px-8 sm:py-8">
       <div className="mb-5 space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Ask about school</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Ask about your schools</h1>
         <p className="text-sm text-muted-foreground">
-          Answers use stored communications for{" "}
-          {household.children.map(({ displayName }) => displayName).join(", ")}.
+          Answers use stored communications across your Household’s schools.
         </p>
       </div>
 
