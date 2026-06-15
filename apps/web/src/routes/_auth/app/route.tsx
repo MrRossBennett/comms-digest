@@ -12,16 +12,7 @@ import {
 } from "@repo/ui/components/dropdown-menu";
 import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, useRouter } from "@tanstack/react-router";
-import {
-  HomeIcon,
-  LogOutIcon,
-  MailIcon,
-  MenuIcon,
-  MessageCircleIcon,
-  Repeat2Icon,
-  SparklesIcon,
-  UserIcon,
-} from "lucide-react";
+import { HomeIcon, LogOutIcon, MenuIcon, MessageCircleIcon, UserIcon } from "lucide-react";
 
 import { ThemeToggle } from "#/components/theme-toggle";
 
@@ -54,33 +45,6 @@ function AppLayout() {
               >
                 <MessageCircleIcon />
                 Chat
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                render={<Link to="/app/routines" />}
-                nativeButton={false}
-              >
-                <Repeat2Icon />
-                Routines
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                render={<Link to="/app/demo" />}
-                nativeButton={false}
-              >
-                <SparklesIcon />
-                Demo
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                render={<Link to="/app/sources" />}
-                nativeButton={false}
-              >
-                <MailIcon />
-                Sources
               </Button>
             </nav>
             <ThemeToggle />
@@ -116,18 +80,6 @@ function MobileNavigation() {
         <DropdownMenuItem render={<Link to="/app/chat" />}>
           <MessageCircleIcon />
           Chat
-        </DropdownMenuItem>
-        <DropdownMenuItem render={<Link to="/app/routines" />}>
-          <Repeat2Icon />
-          Routines
-        </DropdownMenuItem>
-        <DropdownMenuItem render={<Link to="/app/demo" />}>
-          <SparklesIcon />
-          Demo
-        </DropdownMenuItem>
-        <DropdownMenuItem render={<Link to="/app/sources" />}>
-          <MailIcon />
-          Sources
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
