@@ -231,7 +231,7 @@ function HouseholdDigest({
   onDismissedChange: (item: DigestItemType, dismissed: boolean) => void;
 }) {
   const [selectedChildId, setSelectedChildId] = useState<string>();
-  const [selectedCategory, setSelectedCategory] = useState<DigestCategory | "all">("all");
+  const [selectedFilter, setSelectedFilter] = useState<DigestFilter>("all");
   const completed = new Set(completedResponsibilityIds);
   const dismissedClaims = new Set(dismissedClaimIds);
   const dismissedResponsibilities = new Set(dismissedResponsibilityIds);
@@ -253,35 +253,26 @@ function HouseholdDigest({
       ({ item, category }) =>
         isDismissed(item) &&
         appliesToSelectedStudent(item) &&
-        (selectedCategory === "all" || category === selectedCategory),
+        (selectedFilter === "all" || category === selectedFilter),
     ),
   );
-  const completedItems = sortDigestItems(
-    categorizedItems.filter(
-      ({ item, category }) =>
-        category === "actNow" &&
-        (selectedCategory === "all" || selectedCategory === "actNow") &&
-        appliesToSelectedStudent(item) &&
-        !isDismissed(item) &&
-        item.responsibilities.length > 0 &&
-        item.responsibilities.every(({ id }) => completed.has(id)),
-    ),
-  );
-  const activeDigestItems = sortDigestItems(
+  const visibleDigestItems = sortDigestItems(
     categorizedItems.filter(({ item, category }) => {
       if (!appliesToSelectedStudent(item) || isDismissed(item)) return false;
-      if (selectedCategory !== "all" && category !== selectedCategory) return false;
+      const itemIsCompleted = isDigestItemCompleted(item, category, completed);
+      if (selectedFilter === "completed") return itemIsCompleted;
+      if (selectedFilter !== "all" && category !== selectedFilter) return false;
       if (category !== "actNow") return true;
-      return item.responsibilities.some(({ id }) => !completed.has(id));
+      return itemIsCompleted || item.responsibilities.some(({ id }) => !completed.has(id));
     }),
   );
   const visibleRoutineOccurrences = routineOccurrences.filter(
     ({ routine }) =>
       (!selectedChildId || routine.studentIds.includes(selectedChildId)) &&
-      (selectedCategory === "all" || selectedCategory === "comingUp"),
+      (selectedFilter === "all" || selectedFilter === "comingUp"),
   );
-  const activeItems = sortTimelineItems([
-    ...activeDigestItems.map((value) => ({ kind: "digest" as const, value })),
+  const visibleItems = sortTimelineItems([
+    ...visibleDigestItems.map((value) => ({ kind: "digest" as const, value })),
     ...visibleRoutineOccurrences.map((value) => ({ kind: "routine" as const, value })),
   ]);
 
@@ -315,18 +306,22 @@ function HouseholdDigest({
           </div>
         ) : null}
 
-        <div className="flex flex-wrap items-center gap-2" aria-label="Filter Digest by Category">
-          <span className="mr-1 text-sm font-medium text-muted-foreground">Category:</span>
-          {(["all", "actNow", "comingUp", "goodToKnow"] as const).map((category) => (
+        <div className="flex flex-wrap items-center gap-2" aria-label="Filter Digest items">
+          <span className="mr-1 text-sm font-medium text-muted-foreground">Show:</span>
+          {(["all", "actNow", "comingUp", "goodToKnow", "completed"] as const).map((filter) => (
             <Button
-              key={category}
+              key={filter}
               type="button"
               size="sm"
-              variant={selectedCategory === category ? "default" : "outline"}
-              aria-pressed={selectedCategory === category}
-              onClick={() => setSelectedCategory(category)}
+              variant={selectedFilter === filter ? "default" : "outline"}
+              aria-pressed={selectedFilter === filter}
+              onClick={() => setSelectedFilter(filter)}
             >
-              {category === "all" ? "All" : categoryLabels[category]}
+              {filter === "all"
+                ? "All"
+                : filter === "completed"
+                  ? "Completed"
+                  : categoryLabels[filter]}
             </Button>
           ))}
         </div>
@@ -339,9 +334,9 @@ function HouseholdDigest({
           </h2>
           <p className="text-sm text-muted-foreground">Soonest dated items appear first.</p>
         </div>
-        {activeItems.length > 0 ? (
+        {visibleItems.length > 0 ? (
           <div className="grid gap-3">
-            {activeItems.map((timelineItem) =>
+            {visibleItems.map((timelineItem) =>
               timelineItem.kind === "routine" ? (
                 <RoutineOccurrenceItem
                   key={`routine:${timelineItem.value.routine.id}`}
@@ -356,33 +351,61 @@ function HouseholdDigest({
                   householdChildren={householdChildren}
                   communications={communications}
                   detail={formatItemDate(timelineItem.value.item)}
-                  actions={[
-                    {
-                      label: "Dismiss",
-                      icon: <EyeOffIcon />,
-                      variant: "outline",
-                      onClick: () => onDismissedChange(timelineItem.value.item, true),
-                      pending:
-                        digestEvidenceKey(timelineItem.value.item.claims.map(({ id }) => id)) ===
-                        pendingDismissedItemKey,
-                    },
-                    ...(timelineItem.value.category === "actNow"
+                  completed={isDigestItemCompleted(
+                    timelineItem.value.item,
+                    timelineItem.value.category,
+                    completed,
+                  )}
+                  actions={
+                    isDigestItemCompleted(
+                      timelineItem.value.item,
+                      timelineItem.value.category,
+                      completed,
+                    )
                       ? [
                           {
-                            label: "Mark completed",
-                            icon: <CheckIcon />,
-                            variant: "default" as const,
+                            label: "Reopen",
+                            icon: <RotateCcwIcon />,
+                            variant: "outline" as const,
                             onClick: () => {
                               const responsibility = timelineItem.value.item.responsibilities[0];
-                              if (responsibility) onStatusChange(responsibility.id, true);
+                              if (responsibility) onStatusChange(responsibility.id, false);
                             },
                             pending:
                               timelineItem.value.item.responsibilities[0]?.id ===
                               pendingResponsibilityId,
                           },
                         ]
-                      : []),
-                  ]}
+                      : [
+                          {
+                            label: "Dismiss",
+                            icon: <EyeOffIcon />,
+                            variant: "outline" as const,
+                            onClick: () => onDismissedChange(timelineItem.value.item, true),
+                            pending:
+                              digestEvidenceKey(
+                                timelineItem.value.item.claims.map(({ id }) => id),
+                              ) === pendingDismissedItemKey,
+                          },
+                          ...(timelineItem.value.category === "actNow"
+                            ? [
+                                {
+                                  label: "Mark completed",
+                                  icon: <CheckIcon />,
+                                  variant: "default" as const,
+                                  onClick: () => {
+                                    const responsibility =
+                                      timelineItem.value.item.responsibilities[0];
+                                    if (responsibility) onStatusChange(responsibility.id, true);
+                                  },
+                                  pending:
+                                    timelineItem.value.item.responsibilities[0]?.id ===
+                                    pendingResponsibilityId,
+                                },
+                              ]
+                            : []),
+                        ]
+                  }
                 />
               ),
             )}
@@ -391,41 +414,6 @@ function HouseholdDigest({
           <EmptySection>No Digest items match these filters.</EmptySection>
         )}
       </section>
-
-      {completedItems.length > 0 ? (
-        <section aria-labelledby="completed-heading">
-          <div className="mb-3">
-            <h2 id="completed-heading" className="font-semibold tracking-tight">
-              Completed
-            </h2>
-            <p className="text-sm text-muted-foreground">Responsibilities already handled.</p>
-          </div>
-          <div className="grid gap-3">
-            {completedItems.map(({ item, category }) => (
-              <DigestItem
-                key={digestEvidenceKey(item.claims.map(({ id }) => id))}
-                item={item}
-                category={category}
-                householdChildren={householdChildren}
-                communications={communications}
-                detail={formatItemDate(item)}
-                actions={[
-                  {
-                    label: "Reopen",
-                    icon: <RotateCcwIcon />,
-                    variant: "outline",
-                    onClick: () => {
-                      const responsibility = item.responsibilities[0];
-                      if (responsibility) onStatusChange(responsibility.id, false);
-                    },
-                    pending: item.responsibilities[0]?.id === pendingResponsibilityId,
-                  },
-                ]}
-              />
-            ))}
-          </div>
-        </section>
-      ) : null}
 
       {dismissedItems.length > 0 ? (
         <DismissedDigestItems
@@ -442,6 +430,7 @@ function HouseholdDigest({
 
 type DigestItemType = Digest["actNow"][number];
 type DigestCategory = "actNow" | "comingUp" | "goodToKnow";
+type DigestFilter = DigestCategory | "all" | "completed";
 type CategorizedDigestItem = { item: DigestItemType; category: DigestCategory };
 type RoutineOccurrence = { routine: HouseholdRoutine; date: string };
 type TimelineItem =
@@ -466,6 +455,7 @@ function DigestItem({
   householdChildren,
   communications,
   detail,
+  completed = false,
   actions = [],
 }: {
   item: DigestItemType;
@@ -473,6 +463,7 @@ function DigestItem({
   householdChildren: Array<{ id: string; displayName: string }>;
   communications: SchoolCommunication[];
   detail?: string;
+  completed?: boolean;
   actions?: DigestItemAction[];
 }) {
   const names = householdChildren
@@ -483,9 +474,16 @@ function DigestItem({
     <article className="overflow-hidden rounded-2xl border bg-card shadow-sm">
       <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6">
         <div className="min-w-0 space-y-2">
-          <span className="inline-flex rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
-            {categoryLabels[category]}
-          </span>
+          <div className="flex flex-wrap gap-2">
+            <span className="inline-flex rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+              {categoryLabels[category]}
+            </span>
+            {completed ? (
+              <span className="inline-flex rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                Completed
+              </span>
+            ) : null}
+          </div>
           <h3 className="font-semibold tracking-tight">{item.title}</h3>
           {detail ? <p className="text-sm text-muted-foreground">{detail}</p> : null}
           <p className="text-xs font-medium text-muted-foreground">
@@ -704,6 +702,18 @@ function itemDate(item: DigestItemType) {
     ...item.responsibilities.flatMap(({ dueDate }) => dueDate?.resolvedDate ?? []),
     ...item.claims.flatMap(({ date }) => date?.resolvedDate ?? []),
   ].sort()[0];
+}
+
+function isDigestItemCompleted(
+  item: DigestItemType,
+  category: DigestCategory,
+  completedResponsibilityIds: Set<string>,
+) {
+  return (
+    category === "actNow" &&
+    item.responsibilities.length > 0 &&
+    item.responsibilities.every(({ id }) => completedResponsibilityIds.has(id))
+  );
 }
 
 function sortDigestItems(items: CategorizedDigestItem[]) {
