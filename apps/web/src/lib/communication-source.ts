@@ -1,5 +1,30 @@
 import { z } from "zod";
 
+const domainSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .transform((value) => {
+    const addressDomain = value.includes("@") ? value.slice(value.lastIndexOf("@") + 1) : value;
+    return addressDomain.replace(/^\.+|\.+$/g, "");
+  })
+  .pipe(
+    z
+      .string()
+      .min(3, "Enter a valid email domain")
+      .max(253, "Enter a valid email domain")
+      .regex(
+        /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/,
+        "Enter a valid email domain",
+      ),
+  );
+
+export const communicationSourceCreateSchema = z
+  .object({
+    senderDomain: domainSchema,
+  })
+  .strict();
+
 export const communicationSourceReviewSchema = z
   .object({
     sourceId: z.uuid(),
@@ -57,7 +82,13 @@ export function parseSender(value: string) {
   return {
     senderName: senderName || senderAddress,
     senderAddress,
+    senderDomain: domainSchema.parse(senderAddress),
   };
+}
+
+export function parseSenderDomain(value: string) {
+  const result = domainSchema.safeParse(value);
+  return result.success ? result.data : null;
 }
 
 export function hasGmailReadonlyScope(scope: string | null) {

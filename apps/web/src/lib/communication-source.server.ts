@@ -8,10 +8,11 @@ import {
   household,
   school,
 } from "@repo/db/schema";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import {
+  communicationSourceCreateSchema,
   communicationSourceReviewSchema,
   hasGmailReadonlyScope,
   parseSender,
@@ -60,6 +61,7 @@ export async function getSourceReviewForOwner(ownerUserId: string) {
       schoolId: communicationSource.schoolId,
       senderName: communicationSource.senderName,
       senderAddress: communicationSource.senderAddress,
+      senderDomain: communicationSource.senderDomain,
       status: communicationSource.status,
       audience: communicationSource.audience,
       discovery: communicationSource.discovery,
@@ -118,7 +120,8 @@ export async function discoverSampleSourcesForOwner(ownerUserId: string) {
             householdId: householdSetup.id,
             schoolId: householdSchool.id,
             senderName: `${householdSchool.name} Office`,
-            senderAddress: `office-${slug || index + 1}@example.school`,
+            senderAddress: `office@${slug || `school-${index + 1}`}.example`,
+            senderDomain: `${slug || `school-${index + 1}`}.example`,
             discovery: "sample" as const,
             messageCount: 6,
             lastSeenAt: new Date("2026-06-12T15:30:00.000Z"),
@@ -128,7 +131,8 @@ export async function discoverSampleSourcesForOwner(ownerUserId: string) {
             householdId: householdSetup.id,
             schoolId: householdSchool.id,
             senderName: `ParentMail · ${householdSchool.name}`,
-            senderAddress: `parentmail-${slug || index + 1}@example.school`,
+            senderAddress: `updates@parentmail-${slug || index + 1}.example`,
+            senderDomain: `parentmail-${slug || index + 1}.example`,
             discovery: "sample" as const,
             messageCount: 3,
             lastSeenAt: new Date("2026-06-10T08:15:00.000Z"),
@@ -139,6 +143,37 @@ export async function discoverSampleSourcesForOwner(ownerUserId: string) {
     .onConflictDoNothing({
       target: [communicationSource.householdId, communicationSource.senderAddress],
     });
+
+  return getSourceReviewForOwner(ownerUserId);
+}
+
+export async function createCommunicationSourceForOwner(ownerUserId: string, input: unknown) {
+  const source = communicationSourceCreateSchema.parse(input);
+  const householdSetup = await getHouseholdForOwner(ownerUserId);
+  if (!householdSetup) throw new Error("Complete Household setup before adding sources");
+
+  const [existingSource] = await db
+    .select({ id: communicationSource.id })
+    .from(communicationSource)
+    .where(
+      and(
+        eq(communicationSource.householdId, householdSetup.id),
+        eq(communicationSource.senderDomain, source.senderDomain),
+      ),
+    )
+    .limit(1);
+
+  if (existingSource) throw new Error("That email domain is already a Communication Source");
+
+  await db.insert(communicationSource).values({
+    id: crypto.randomUUID(),
+    householdId: householdSetup.id,
+    senderName: source.senderDomain,
+    senderAddress: source.senderDomain,
+    senderDomain: source.senderDomain,
+    discovery: "manual",
+    messageCount: 0,
+  });
 
   return getSourceReviewForOwner(ownerUserId);
 }
@@ -176,7 +211,13 @@ export async function scanGmailSourcesForOwner(ownerUserId: string) {
 
   const senders = new Map<
     string,
-    { senderName: string; senderAddress: string; messageCount: number; lastSeenAt: Date | null }
+    {
+      senderName: string;
+      senderAddress: string;
+      senderDomain: string;
+      messageCount: number;
+      lastSeenAt: Date | null;
+    }
   >();
 
   for (const message of metadata) {
@@ -191,9 +232,9 @@ export async function scanGmailSourcesForOwner(ownerUserId: string) {
       receivedAtMilliseconds !== null && Number.isFinite(receivedAtMilliseconds)
         ? new Date(receivedAtMilliseconds)
         : null;
-    const existing = senders.get(sender.senderAddress);
+    const existing = senders.get(sender.senderDomain);
 
-    senders.set(sender.senderAddress, {
+    senders.set(sender.senderDomain, {
       ...sender,
       messageCount: (existing?.messageCount ?? 0) + 1,
       lastSeenAt:
@@ -204,29 +245,42 @@ export async function scanGmailSourcesForOwner(ownerUserId: string) {
   }
 
   if (senders.size > 0) {
-    await db
-      .insert(communicationSource)
-      .values(
-        [...senders.values()].map((sender) => ({
+    for (const sender of senders.values()) {
+      const [existingSource] = await db
+        .select({ id: communicationSource.id })
+        .from(communicationSource)
+        .where(
+          and(
+            eq(communicationSource.householdId, sourceReview.household.id),
+            eq(communicationSource.senderDomain, sender.senderDomain),
+          ),
+        )
+        .limit(1);
+
+      if (existingSource) {
+        await db
+          .update(communicationSource)
+          .set({
+            senderName: sender.senderName,
+            senderAddress: sender.senderAddress,
+            discovery: "gmail",
+            messageCount: sender.messageCount,
+            lastSeenAt: sender.lastSeenAt,
+          })
+          .where(eq(communicationSource.id, existingSource.id));
+      } else {
+        await db.insert(communicationSource).values({
           id: crypto.randomUUID(),
           householdId: sourceReview.household.id,
           senderName: sender.senderName,
           senderAddress: sender.senderAddress,
+          senderDomain: sender.senderDomain,
           discovery: "gmail" as const,
           messageCount: sender.messageCount,
           lastSeenAt: sender.lastSeenAt,
-        })),
-      )
-      .onConflictDoUpdate({
-        target: [communicationSource.householdId, communicationSource.senderAddress],
-        set: {
-          senderName: sql`excluded.sender_name`,
-          discovery: sql`excluded.discovery`,
-          messageCount: sql`excluded.message_count`,
-          lastSeenAt: sql`excluded.last_seen_at`,
-          updatedAt: sql`now()`,
-        },
-      });
+        });
+      }
+    }
   }
 
   return getSourceReviewForOwner(ownerUserId);

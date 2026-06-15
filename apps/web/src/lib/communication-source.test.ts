@@ -4,6 +4,7 @@ import {
   communicationSourceReviewSchema,
   hasGmailReadonlyScope,
   parseSender,
+  parseSenderDomain,
 } from "./communication-source";
 
 describe("Communication Source Review", () => {
@@ -11,8 +12,15 @@ describe("Communication Source Review", () => {
     expect(parseSender('"Riverside Primary" <Office@Riverside.example>')).toEqual({
       senderName: "Riverside Primary",
       senderAddress: "office@riverside.example",
+      senderDomain: "riverside.example",
     });
     expect(parseSender("not an email")).toBeNull();
+  });
+
+  test("normalises a domain from either a domain or full email address", () => {
+    expect(parseSenderDomain("  MAIL.Woodlands.Kent.Sch.UK ")).toBe("mail.woodlands.kent.sch.uk");
+    expect(parseSenderDomain("office@Woodlands.Kent.Sch.UK")).toBe("woodlands.kent.sch.uk");
+    expect(parseSenderDomain("not a domain")).toBeNull();
   });
 
   test("requires selected Children to have a School assignment", () => {
