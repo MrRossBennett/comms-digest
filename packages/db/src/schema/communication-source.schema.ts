@@ -25,6 +25,7 @@ export const communicationSourceAudience = pgEnum("communication_source_audience
 
 export const communicationSourceDiscovery = pgEnum("communication_source_discovery", [
   "gmail",
+  "manual",
   "sample",
 ]);
 
@@ -38,6 +39,7 @@ export const communicationSource = pgTable(
     schoolId: text("school_id").references(() => school.id, { onDelete: "cascade" }),
     senderName: text("sender_name").notNull(),
     senderAddress: text("sender_address").notNull(),
+    senderDomain: text("sender_domain").notNull(),
     status: communicationSourceStatus("status").default("pending").notNull(),
     audience: communicationSourceAudience("audience").default("school").notNull(),
     discovery: communicationSourceDiscovery("discovery").notNull(),
@@ -55,6 +57,10 @@ export const communicationSource = pgTable(
       table.senderAddress,
     ),
     index("communication_source_household_id_idx").on(table.householdId),
+    uniqueIndex("communication_source_household_domain_idx").on(
+      table.householdId,
+      table.senderDomain,
+    ),
     index("communication_source_school_id_idx").on(table.schoolId),
   ],
 );

@@ -31,8 +31,8 @@ Once fetched from a confirmed **Communication Source**, its source text is store
 _Avoid_: Correspondence, content, document
 
 **Communication Source**:
-A sender or recurring origin of **School Communications**, such as a school office, teacher, club, or school messaging service. A confirmed **Communication Source** may be relevant to one or more **Students** or the whole **Household**.
-Discovery stores sender identity, message count, and most recent date only. Message subjects and bodies are not persisted during discovery.
+An email domain used by a recurring origin of **School Communications**, such as a School or school messaging service. It includes messages from every sender address at that domain, so a **Household Owner** does not need to configure each office, teacher, club, or newsletter address separately. A confirmed **Communication Source** may be relevant to one or more **Students** or the whole **Household**.
+Discovery stores the sender domain, a representative sender identity, message count, and most recent date only. Message subjects and bodies are not persisted during discovery.
 _Avoid_: Sender rule, Gmail filter, contact
 
 **Source Review**:

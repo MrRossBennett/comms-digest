@@ -1,6 +1,22 @@
 import { authClient } from "@repo/auth/auth-client";
 import { Button } from "@repo/ui/components/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@repo/ui/components/dialog";
+import { Input } from "@repo/ui/components/input";
 import { Label } from "@repo/ui/components/label";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@repo/ui/components/tooltip";
 import { useMutation } from "@tanstack/react-query";
 import { createFileRoute, Link, redirect, useRouter } from "@tanstack/react-router";
 import {
@@ -10,14 +26,17 @@ import {
   InboxIcon,
   LoaderCircleIcon,
   MailIcon,
+  PlusIcon,
   RefreshCwIcon,
+  SaveIcon,
   TestTube2Icon,
-  XIcon,
+  Trash2Icon,
 } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 
 import {
+  $createCommunicationSource,
   $discoverSampleSources,
   $getSourceReview,
   $saveCommunicationSourceReview,
@@ -44,6 +63,20 @@ function SourceReviewPage() {
   const sourceReview = Route.useLoaderData();
   const router = useRouter();
   const [connecting, setConnecting] = useState(false);
+  const [addSourceOpen, setAddSourceOpen] = useState(false);
+  const [senderDomain, setSenderDomain] = useState("");
+  const createMutation = useMutation({
+    mutationFn: $createCommunicationSource,
+    onSuccess: async () => {
+      setSenderDomain("");
+      setAddSourceOpen(false);
+      await router.invalidate({ sync: true });
+      toast.success("Communication Source added.");
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "The source could not be added.");
+    },
+  });
   const discoveryMutation = useMutation({
     mutationFn: (mode: "gmail" | "sample") =>
       mode === "gmail" ? $scanGmailSources() : $discoverSampleSources(),
@@ -99,8 +132,8 @@ function SourceReviewPage() {
           Choose what counts as school communication
         </h1>
         <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-          Comms Digest suggests recurring senders. You decide which ones belong in your Household
-          Digest and who they apply to.
+          Comms Digest suggests recurring email domains. You decide which ones belong in your
+          Household Digest and who they apply to.
         </p>
       </div>
 
@@ -164,8 +197,8 @@ function SourceReviewPage() {
                 </h2>
                 <p className="mt-1 max-w-xl text-sm leading-6 text-muted-foreground">
                   {sourceReview.gmailConnected
-                    ? "Run a Gmail scan to find recurring school senders."
-                    : "Try the workflow with synthetic senders, or connect Gmail and run a scan."}
+                    ? "Run a Gmail scan to find recurring school email domains."
+                    : "Try the workflow with synthetic domains, or connect Gmail and run a scan."}
                 </p>
               </div>
             </div>
@@ -190,7 +223,7 @@ function SourceReviewPage() {
         <div className="space-y-8">
           <SourceGroup
             title="Needs review"
-            description="Confirm useful senders or reject anything unrelated."
+            description="Confirm useful domains or reject anything unrelated."
             sources={pendingSources}
             sourceReview={sourceReview}
             pendingSourceId={
@@ -200,9 +233,66 @@ function SourceReviewPage() {
           />
           <SourceGroup
             title="Confirmed sources"
-            description="Messages from these senders can enter the Digest pipeline."
+            description="Messages from these domains can enter the Digest pipeline."
             sources={confirmedSources}
             sourceReview={sourceReview}
+            headerAction={
+              <Dialog
+                open={addSourceOpen}
+                onOpenChange={(open) => {
+                  setAddSourceOpen(open);
+                  if (!open) setSenderDomain("");
+                }}
+              >
+                <DialogTrigger render={<Button type="button" />}>
+                  <PlusIcon />
+                  Add source
+                </DialogTrigger>
+                <DialogContent>
+                  <form
+                    className="grid gap-6"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      createMutation.mutate({ data: { senderDomain } });
+                    }}
+                  >
+                    <DialogHeader>
+                      <DialogTitle>Add a Communication Source</DialogTitle>
+                      <DialogDescription>
+                        All messages from this domain will count.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-2">
+                      <Label htmlFor="sender-domain">Email domain</Label>
+                      <Input
+                        id="sender-domain"
+                        name="senderDomain"
+                        type="text"
+                        inputMode="url"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        placeholder="school.example.org"
+                        value={senderDomain}
+                        onChange={(event) => setSenderDomain(event.target.value)}
+                      />
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        type="submit"
+                        disabled={createMutation.isPending || !senderDomain.trim()}
+                      >
+                        {createMutation.isPending ? (
+                          <LoaderCircleIcon className="animate-spin" />
+                        ) : (
+                          <PlusIcon />
+                        )}
+                        Add source
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            }
             pendingSourceId={
               reviewMutation.isPending ? reviewMutation.variables?.data.sourceId : undefined
             }
@@ -227,6 +317,7 @@ function SourceGroup({
   description,
   sources,
   sourceReview,
+  headerAction,
   pendingSourceId,
   onReview,
 }: {
@@ -234,16 +325,20 @@ function SourceGroup({
   description: string;
   sources: Source[];
   sourceReview: SourceReview;
+  headerAction?: ReactNode;
   pendingSourceId?: string;
   onReview: (data: Parameters<typeof $saveCommunicationSourceReview>[0]["data"]) => void;
 }) {
-  if (sources.length === 0) return null;
+  if (sources.length === 0 && !headerAction) return null;
 
   return (
     <section>
-      <div className="mb-3">
-        <h2 className="font-semibold tracking-tight">{title}</h2>
-        <p className="text-sm text-muted-foreground">{description}</p>
+      <div className="mb-3 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="font-semibold tracking-tight">{title}</h2>
+          <p className="text-sm text-muted-foreground">{description}</p>
+        </div>
+        {headerAction}
       </div>
       <div className="grid gap-4">
         {sources.map((source) => (
@@ -285,7 +380,7 @@ function RejectedSourceGroup({
             </span>
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            These senders are excluded from the Digest pipeline.
+            These domains are excluded from the Digest pipeline.
           </p>
         </div>
         <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
@@ -334,14 +429,22 @@ function SourceCard({
   const schoolChildren = householdChildren.filter(
     (householdChild) => householdChild.schoolId === schoolId,
   );
+  const selectedSchoolId = audience === "household" ? null : schoolId;
+  const selectedChildIds = audience === "children" ? childIds : [];
+  const hasChanges =
+    source.status !== "confirmed" ||
+    audience !== source.audience ||
+    selectedSchoolId !== source.schoolId ||
+    selectedChildIds.length !== source.childIds.length ||
+    selectedChildIds.some((childId) => !source.childIds.includes(childId));
 
   const review = (status: "confirmed" | "rejected") => {
     onReview({
       sourceId: source.id,
       status,
       audience,
-      schoolId: audience === "household" ? null : schoolId,
-      childIds: audience === "children" ? childIds : [],
+      schoolId: selectedSchoolId,
+      childIds: selectedChildIds,
     });
   };
 
@@ -360,35 +463,56 @@ function SourceCard({
               <h3 className="font-semibold tracking-tight">{source.senderName}</h3>
               <SourceStatus status={source.status} />
             </div>
-            <p className="mt-1 truncate text-sm text-muted-foreground">{source.senderAddress}</p>
+            <p className="mt-1 truncate text-sm text-muted-foreground">@{source.senderDomain}</p>
             <p className="mt-2 text-xs text-muted-foreground">
               {source.messageCount} matching {source.messageCount === 1 ? "message" : "messages"}
               {source.lastSeenAt ? ` · Last seen ${formatDate(source.lastSeenAt)}` : ""}
-              {source.discovery === "sample" ? " · Sample" : ""}
+              {source.discovery === "sample"
+                ? " · Sample"
+                : source.discovery === "manual"
+                  ? " · Added manually"
+                  : ""}
             </p>
           </div>
           <div className="flex gap-2">
             <Button
               type="button"
-              variant="outline"
-              disabled={pending}
-              onClick={() => review("rejected")}
-            >
-              <XIcon />
-              Reject
-            </Button>
-            <Button
-              type="button"
               disabled={
                 pending ||
+                !hasChanges ||
                 (audience !== "household" && !schoolId) ||
                 (audience === "children" && childIds.length === 0)
               }
               onClick={() => review("confirmed")}
             >
-              {pending ? <LoaderCircleIcon className="animate-spin" /> : <CheckIcon />}
-              Confirm
+              {pending ? (
+                <LoaderCircleIcon className="animate-spin" />
+              ) : source.status === "confirmed" ? (
+                <SaveIcon />
+              ) : (
+                <CheckIcon />
+              )}
+              {source.status === "confirmed" ? "Save changes" : "Confirm"}
             </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      aria-label="Reject source"
+                      disabled={pending}
+                      onClick={() => review("rejected")}
+                    />
+                  }
+                >
+                  <Trash2Icon />
+                </TooltipTrigger>
+                <TooltipContent>Reject source</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
 

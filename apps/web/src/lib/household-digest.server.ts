@@ -28,6 +28,7 @@ import { createLiveExtractor } from "@repo/intelligence/live";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
+import { parseSender } from "./communication-source";
 import { listDismissedDigestEvidenceIds } from "./digest-item-status.server";
 import { getErrorMessage } from "./error-message";
 import { gmailRequest } from "./gmail";
@@ -67,6 +68,7 @@ type IngestionCandidate = {
   externalMessageId: string;
   receivedAt: string;
   subject: string;
+  senderAddress: string;
   sourceText: string;
   recordedExtraction?: z.infer<typeof modelExtractionSchema>;
 };
@@ -196,7 +198,7 @@ async function listConfirmedSources(householdId: string) {
       id: communicationSource.id,
       schoolId: communicationSource.schoolId,
       senderName: communicationSource.senderName,
-      senderAddress: communicationSource.senderAddress,
+      senderDomain: communicationSource.senderDomain,
       audience: communicationSource.audience,
       discovery: communicationSource.discovery,
     })
@@ -251,6 +253,7 @@ function createSampleCandidate(
       externalMessageId,
       receivedAt,
       subject: `${name}'s museum visit`,
+      senderAddress: `office@${source.senderDomain}`,
       sourceText,
       recordedExtraction: modelExtractionSchema.parse({
         claims: [
@@ -290,6 +293,7 @@ function createSampleCandidate(
     externalMessageId,
     receivedAt,
     subject: "Sports day",
+    senderAddress: `office@${source.senderDomain}`,
     sourceText,
     recordedExtraction: modelExtractionSchema.parse({
       claims: [
@@ -357,7 +361,7 @@ async function fetchGmailCandidates(
   for (const source of sources) {
     const list = gmailMessageListSchema.parse(
       await gmailRequest(
-        `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=20&q=${encodeURIComponent(`newer_than:30d from:${source.senderAddress}`)}`,
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=20&q=${encodeURIComponent(`newer_than:30d from:${source.senderDomain}`)}`,
         accessToken,
       ),
     );
@@ -395,6 +399,11 @@ async function fetchGmailCandidates(
     const subject =
       message.payload.headers?.find(({ name }) => name.toLocaleLowerCase("en-GB") === "subject")
         ?.value ?? "School communication";
+    const fromHeader = message.payload.headers?.find(
+      ({ name }) => name.toLocaleLowerCase("en-GB") === "from",
+    )?.value;
+    const sender = fromHeader ? parseSender(fromHeader) : null;
+    if (!sender || sender.senderDomain !== source.senderDomain) continue;
     const sourceText = extractGmailText(message.payload);
     if (!sourceText) continue;
 
@@ -403,6 +412,7 @@ async function fetchGmailCandidates(
       externalMessageId: message.id,
       receivedAt: new Date(Number(message.internalDate)).toISOString(),
       subject,
+      senderAddress: sender.senderAddress,
       sourceText: limitGmailSourceText(sourceText),
     });
   }
@@ -451,7 +461,7 @@ async function persistExtraction(
         schoolId: extraction.communication.schoolId,
         sourceAudience: candidate.source.audience,
         externalMessageId: candidate.externalMessageId,
-        senderAddress: candidate.source.senderAddress,
+        senderAddress: candidate.senderAddress,
         receivedAt: new Date(extraction.communication.receivedAt),
         subject: extraction.communication.subject,
         sourceText: extraction.communication.sourceText,

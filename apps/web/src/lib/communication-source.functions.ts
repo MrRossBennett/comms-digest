@@ -2,8 +2,12 @@ import { authMiddleware, freshAuthMiddleware } from "@repo/auth/tanstack/middlew
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 
-import { communicationSourceReviewSchema } from "./communication-source";
 import {
+  communicationSourceCreateSchema,
+  communicationSourceReviewSchema,
+} from "./communication-source";
+import {
+  createCommunicationSourceForOwner,
   discoverSampleSourcesForOwner,
   getSourceReviewForOwner,
   saveCommunicationSourceReviewForOwner,
@@ -29,6 +33,14 @@ export const $scanGmailSources = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     setResponseHeader("Cache-Control", "no-store");
     return scanGmailSourcesForOwner(context.user.id);
+  });
+
+export const $createCommunicationSource = createServerFn({ method: "POST" })
+  .middleware([freshAuthMiddleware])
+  .validator(communicationSourceCreateSchema)
+  .handler(async ({ context, data }) => {
+    setResponseHeader("Cache-Control", "no-store");
+    return createCommunicationSourceForOwner(context.user.id, data);
   });
 
 export const $saveCommunicationSourceReview = createServerFn({ method: "POST" })
