@@ -15,6 +15,12 @@ export type GroundedChatEvidence = {
   schoolName?: string;
   audience: string;
   studentNames: string[];
+  responsibilities: Array<{
+    title: string;
+    dueDateOriginalWording?: string;
+    amountCurrency?: string;
+    amountMinorUnits?: number;
+  }>;
 };
 
 export type GroundedChatSource = GroundedChatEvidence;
@@ -83,6 +89,18 @@ const overviewTerms = new Set([
   "upcoming",
 ]);
 
+const paymentTerms = new Set([
+  "charge",
+  "charges",
+  "cost",
+  "costs",
+  "fee",
+  "fees",
+  "pay",
+  "payment",
+  "payments",
+]);
+
 function normalizedTerms(value: string) {
   return [
     ...new Set(
@@ -96,8 +114,12 @@ function normalizedTerms(value: string) {
 }
 
 function evidenceScore(terms: string[], evidence: GroundedChatEvidence) {
+  const responsibilityText = evidence.responsibilities
+    .map(({ title, dueDateOriginalWording }) => `${title} ${dueDateOriginalWording ?? ""}`)
+    .join(" ");
   const fields = [
     { value: evidence.claim, weight: 5 },
+    { value: responsibilityText, weight: 6 },
     { value: evidence.studentNames.join(" "), weight: 5 },
     { value: evidence.audience, weight: 4 },
     { value: evidence.subject ?? "", weight: 3 },
@@ -118,6 +140,29 @@ function evidenceScore(terms: string[], evidence: GroundedChatEvidence) {
   );
 }
 
+function isPaymentEvidence(evidence: GroundedChatEvidence) {
+  if (
+    evidence.responsibilities.some(
+      ({ amountCurrency, amountMinorUnits }) =>
+        Boolean(amountCurrency) || amountMinorUnits !== undefined,
+    )
+  ) {
+    return true;
+  }
+
+  const searchableText = [
+    evidence.claim,
+    evidence.citation,
+    evidence.subject,
+    ...evidence.responsibilities.map(({ title }) => title),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLocaleLowerCase("en-GB");
+
+  return normalizedTerms(searchableText).some((term) => paymentTerms.has(term));
+}
+
 export function selectChatEvidence(
   question: string,
   evidence: GroundedChatEvidence[],
@@ -125,6 +170,10 @@ export function selectChatEvidence(
 ) {
   const terms = normalizedTerms(question);
   const isOverviewQuestion = terms.some((term) => overviewTerms.has(term));
+  const isPaymentQuestion = terms.some((term) => paymentTerms.has(term));
+  const isResponsibilityQuestion =
+    /\bneed to do\b/iu.test(question) ||
+    terms.some((term) => ["action", "actions", "outstanding"].includes(term));
   const scoredEvidence = evidence
     .map((item) => ({ item, score: evidenceScore(terms, item) }))
     .filter(({ score }) => score > 0 || isOverviewQuestion)
@@ -133,6 +182,20 @@ export function selectChatEvidence(
         right.score - left.score ||
         Date.parse(right.item.receivedAt) - Date.parse(left.item.receivedAt),
     );
+
+  if (isPaymentQuestion) {
+    return scoredEvidence
+      .filter(({ item }) => isPaymentEvidence(item))
+      .slice(0, limit)
+      .map(({ item }) => item);
+  }
+
+  if (isResponsibilityQuestion) {
+    return scoredEvidence
+      .filter(({ item }) => item.responsibilities.length > 0)
+      .slice(0, limit)
+      .map(({ item }) => item);
+  }
 
   if (isOverviewQuestion) {
     return scoredEvidence.slice(0, limit).map(({ item }) => item);
@@ -188,6 +251,23 @@ Claim: ${item.claim}
 Exact supporting passage: ${JSON.stringify(item.citation)}
 Audience: ${item.audience}
 Students: ${item.studentNames.join(", ") || "Not specifically identified"}
+Unresolved responsibilities: ${
+        item.responsibilities.length
+          ? item.responsibilities
+              .map(({ title, dueDateOriginalWording, amountCurrency, amountMinorUnits }) =>
+                [
+                  title,
+                  dueDateOriginalWording ? `due ${dueDateOriginalWording}` : undefined,
+                  amountCurrency && amountMinorUnits !== undefined
+                    ? `${amountCurrency} ${(amountMinorUnits / 100).toFixed(2)}`
+                    : undefined,
+                ]
+                  .filter(Boolean)
+                  .join(", "),
+              )
+              .join("; ")
+          : "None"
+      }
 School: ${item.schoolName ?? "Not identified"}
 Subject: ${item.subject ?? "No subject"}
 Sender: ${item.senderAddress}

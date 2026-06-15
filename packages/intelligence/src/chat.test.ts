@@ -20,6 +20,7 @@ const evidence: GroundedChatEvidence[] = [
     schoolName: "Oakfield Primary",
     audience: "Year 4",
     studentNames: ["Alex"],
+    responsibilities: [],
   },
   {
     id: "trip",
@@ -31,6 +32,14 @@ const evidence: GroundedChatEvidence[] = [
     schoolName: "Oakfield Primary",
     audience: "Year 6",
     studentNames: ["Sam"],
+    responsibilities: [
+      {
+        title: "Pay for the museum trip",
+        dueDateOriginalWording: "Friday",
+        amountCurrency: "GBP",
+        amountMinorUnits: 1_200,
+      },
+    ],
   },
 ];
 
@@ -40,10 +49,15 @@ test("selects evidence matching a Student name and topic", () => {
   ]);
 });
 
-test("returns recent evidence for an overview question", () => {
-  expect(selectChatEvidence("What do I need to know next?", evidence).map(({ id }) => id)).toEqual([
+test("returns unresolved Responsibilities for an action overview question", () => {
+  expect(selectChatEvidence("What do I need to do next?", evidence).map(({ id }) => id)).toEqual([
     "trip",
-    "swimming",
+  ]);
+});
+
+test("returns payment Responsibilities for a payment overview question", () => {
+  expect(selectChatEvidence("Are there any payments due?", evidence).map(({ id }) => id)).toEqual([
+    "trip",
   ]);
 });
 
@@ -64,6 +78,7 @@ test("drops weak partial matches when one source strongly matches the question",
       claim: "The Summer Concert is on Thursday.",
       subject: "Summer Concert",
       citation: "Summer Concert on Thursday.",
+      responsibilities: [],
     },
     {
       ...evidence[1]!,
@@ -71,6 +86,7 @@ test("drops weak partial matches when one source strongly matches the question",
       claim: "The summer festival is approaching.",
       subject: "Summer Festival",
       citation: "The summer festival is approaching.",
+      responsibilities: [],
     },
   ];
 

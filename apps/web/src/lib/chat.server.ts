@@ -6,15 +6,18 @@ import {
   claim,
   claimStatus,
   household,
+  responsibility,
+  responsibilityClaim,
+  responsibilityStatus,
   school,
   schoolCommunication,
   schoolCommunicationChild,
 } from "@repo/db/schema";
 import type { GroundedChatEvidence } from "@repo/intelligence";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 
 export async function listGroundedChatEvidence(userId: string) {
-  const [rows, householdChildren, communicationChildren] = await Promise.all([
+  const [rows, householdChildren, communicationChildren, responsibilityRows] = await Promise.all([
     db
       .select({
         id: citation.id,
@@ -67,6 +70,33 @@ export async function listGroundedChatEvidence(userId: string) {
       )
       .innerJoin(household, eq(schoolCommunication.householdId, household.id))
       .where(eq(household.ownerUserId, userId)),
+    db
+      .select({
+        claimId: responsibilityClaim.claimId,
+        title: responsibility.title,
+        dueDateOriginalWording: responsibility.dueDateOriginalWording,
+        amountCurrency: responsibility.amountCurrency,
+        amountMinorUnits: responsibility.amountMinorUnits,
+      })
+      .from(responsibilityClaim)
+      .innerJoin(responsibility, eq(responsibilityClaim.responsibilityId, responsibility.id))
+      .innerJoin(household, eq(responsibility.householdId, household.id))
+      .leftJoin(
+        responsibilityStatus,
+        and(
+          eq(responsibilityStatus.responsibilityId, responsibility.id),
+          eq(responsibilityStatus.userId, userId),
+        ),
+      )
+      .where(
+        and(
+          eq(household.ownerUserId, userId),
+          or(
+            isNull(responsibilityStatus.responsibilityId),
+            eq(responsibilityStatus.status, "unresolved"),
+          ),
+        ),
+      ),
   ]);
 
   return rows.map((row): GroundedChatEvidence => {
@@ -98,6 +128,14 @@ export async function listGroundedChatEvidence(userId: string) {
       schoolName: row.schoolName ?? undefined,
       audience: row.audience,
       studentNames,
+      responsibilities: responsibilityRows
+        .filter(({ claimId }) => claimId === row.claimId)
+        .map(({ title, dueDateOriginalWording, amountCurrency, amountMinorUnits }) => ({
+          title,
+          dueDateOriginalWording: dueDateOriginalWording ?? undefined,
+          amountCurrency: amountCurrency ?? undefined,
+          amountMinorUnits: amountMinorUnits ?? undefined,
+        })),
     };
   });
 }

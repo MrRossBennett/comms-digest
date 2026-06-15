@@ -3,12 +3,9 @@ import { Button } from "@repo/ui/components/button";
 import { useMutation } from "@tanstack/react-query";
 import { createFileRoute, Link, redirect, useRouter } from "@tanstack/react-router";
 import {
-  CalendarDaysIcon,
   CheckIcon,
-  CheckCircle2Icon,
   ChevronDownIcon,
   FileTextIcon,
-  InfoIcon,
   LoaderCircleIcon,
   MailIcon,
   EyeOffIcon,
@@ -17,7 +14,7 @@ import {
   RotateCcwIcon,
   Settings2Icon,
 } from "lucide-react";
-import { Fragment } from "react";
+import { Fragment, useState } from "react";
 import { toast } from "sonner";
 
 import { digestEvidenceKey, isDigestItemDismissed } from "#/lib/digest-item-status";
@@ -213,81 +210,109 @@ function HouseholdDigest({
   onStatusChange: (responsibilityId: string, completed: boolean) => void;
   onDismissedChange: (item: DigestItemType, dismissed: boolean) => void;
 }) {
+  const [selectedChildId, setSelectedChildId] = useState<string>();
+  const [selectedCategory, setSelectedCategory] = useState<DigestCategory | "all">("all");
   const completed = new Set(completedResponsibilityIds);
   const dismissedClaims = new Set(dismissedClaimIds);
   const dismissedResponsibilities = new Set(dismissedResponsibilityIds);
   const isDismissed = (item: DigestItemType) =>
     isDigestItemDismissed(item, dismissedClaims, dismissedResponsibilities);
-  const dismissedItems = [...digest.actNow, ...digest.comingUp, ...digest.goodToKnow].filter(
-    isDismissed,
+  const appliesToSelectedStudent = (item: DigestItemType) =>
+    !selectedChildId || item.childIds.includes(selectedChildId);
+  const categorizedItems: CategorizedDigestItem[] = [
+    ...digest.actNow.map((item) => ({ item, category: "actNow" as const })),
+    ...digest.comingUp.map((item) => ({ item, category: "comingUp" as const })),
+    ...digest.goodToKnow.map((item) => ({ item, category: "goodToKnow" as const })),
+  ];
+  const dismissedItems = sortDigestItems(
+    categorizedItems.filter(
+      ({ item, category }) =>
+        isDismissed(item) &&
+        appliesToSelectedStudent(item) &&
+        (selectedCategory === "all" || category === selectedCategory),
+    ),
   );
-  const actNow = digest.actNow.filter(
-    (item) => !isDismissed(item) && item.responsibilities.some(({ id }) => !completed.has(id)),
+  const completedItems = sortDigestItems(
+    categorizedItems.filter(
+      ({ item, category }) =>
+        category === "actNow" &&
+        (selectedCategory === "all" || selectedCategory === "actNow") &&
+        appliesToSelectedStudent(item) &&
+        !isDismissed(item) &&
+        item.responsibilities.length > 0 &&
+        item.responsibilities.every(({ id }) => completed.has(id)),
+    ),
   );
-  const completedItems = digest.actNow.filter(
-    (item) =>
-      !isDismissed(item) &&
-      item.responsibilities.length > 0 &&
-      item.responsibilities.every(({ id }) => completed.has(id)),
+  const activeItems = sortDigestItems(
+    categorizedItems.filter(({ item, category }) => {
+      if (!appliesToSelectedStudent(item) || isDismissed(item)) return false;
+      if (selectedCategory !== "all" && category !== selectedCategory) return false;
+      if (category !== "actNow") return true;
+      return item.responsibilities.some(({ id }) => !completed.has(id));
+    }),
   );
-  const comingUp = digest.comingUp.filter((item) => !isDismissed(item));
-  const goodToKnow = digest.goodToKnow.filter((item) => !isDismissed(item));
 
   return (
     <div className="grid gap-8">
-      <DigestSection
-        title="Act Now"
-        description="Responsibilities that need your attention."
-        icon={<CheckCircle2Icon />}
-      >
-        {actNow.length > 0 ? (
-          <div className="grid gap-3">
-            {actNow.map((item) => (
-              <DigestItem
-                key={digestEvidenceKey(item.claims.map(({ id }) => id))}
-                item={item}
-                householdChildren={householdChildren}
-                communications={communications}
-                actions={[
-                  {
-                    label: "Dismiss",
-                    icon: <EyeOffIcon />,
-                    variant: "outline",
-                    onClick: () => onDismissedChange(item, true),
-                    pending:
-                      digestEvidenceKey(item.claims.map(({ id }) => id)) ===
-                      pendingDismissedItemKey,
-                  },
-                  {
-                    label: "Mark completed",
-                    icon: <CheckIcon />,
-                    variant: "default",
-                    onClick: () => {
-                      const responsibility = item.responsibilities[0];
-                      if (responsibility) onStatusChange(responsibility.id, true);
-                    },
-                    pending: item.responsibilities[0]?.id === pendingResponsibilityId,
-                  },
-                ]}
-              />
+      <div className="grid gap-3">
+        {householdChildren.length > 1 ? (
+          <div className="flex flex-wrap items-center gap-2" aria-label="Filter Digest by Student">
+            <span className="mr-1 text-sm font-medium text-muted-foreground">Student:</span>
+            <Button
+              type="button"
+              size="sm"
+              variant={selectedChildId ? "outline" : "default"}
+              aria-pressed={!selectedChildId}
+              onClick={() => setSelectedChildId(undefined)}
+            >
+              All students
+            </Button>
+            {householdChildren.map(({ id, displayName }) => (
+              <Button
+                key={id}
+                type="button"
+                size="sm"
+                variant={selectedChildId === id ? "default" : "outline"}
+                aria-pressed={selectedChildId === id}
+                onClick={() => setSelectedChildId(id)}
+              >
+                {displayName}
+              </Button>
             ))}
           </div>
-        ) : (
-          <EmptySection>Nothing needs your attention.</EmptySection>
-        )}
-      </DigestSection>
+        ) : null}
 
-      <DigestSection
-        title="Coming Up"
-        description="Dates and activities to anticipate."
-        icon={<CalendarDaysIcon />}
-      >
-        {comingUp.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2" aria-label="Filter Digest by Category">
+          <span className="mr-1 text-sm font-medium text-muted-foreground">Category:</span>
+          {(["all", "actNow", "comingUp", "goodToKnow"] as const).map((category) => (
+            <Button
+              key={category}
+              type="button"
+              size="sm"
+              variant={selectedCategory === category ? "default" : "outline"}
+              aria-pressed={selectedCategory === category}
+              onClick={() => setSelectedCategory(category)}
+            >
+              {category === "all" ? "All" : categoryLabels[category]}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      <section aria-labelledby="digest-items-heading">
+        <div className="mb-3">
+          <h2 id="digest-items-heading" className="font-semibold tracking-tight">
+            Digest items
+          </h2>
+          <p className="text-sm text-muted-foreground">Soonest dated items appear first.</p>
+        </div>
+        {activeItems.length > 0 ? (
           <div className="grid gap-3">
-            {comingUp.map((item) => (
+            {activeItems.map(({ item, category }) => (
               <DigestItem
                 key={digestEvidenceKey(item.claims.map(({ id }) => id))}
                 item={item}
+                category={category}
                 householdChildren={householdChildren}
                 communications={communications}
                 detail={formatItemDate(item)}
@@ -301,60 +326,46 @@ function HouseholdDigest({
                       digestEvidenceKey(item.claims.map(({ id }) => id)) ===
                       pendingDismissedItemKey,
                   },
+                  ...(category === "actNow"
+                    ? [
+                        {
+                          label: "Mark completed",
+                          icon: <CheckIcon />,
+                          variant: "default" as const,
+                          onClick: () => {
+                            const responsibility = item.responsibilities[0];
+                            if (responsibility) onStatusChange(responsibility.id, true);
+                          },
+                          pending: item.responsibilities[0]?.id === pendingResponsibilityId,
+                        },
+                      ]
+                    : []),
                 ]}
               />
             ))}
           </div>
         ) : (
-          <EmptySection>Nothing currently scheduled.</EmptySection>
+          <EmptySection>No Digest items match these filters.</EmptySection>
         )}
-      </DigestSection>
-
-      <DigestSection
-        title="Good to Know"
-        description="Useful updates that do not need action."
-        icon={<InfoIcon />}
-      >
-        {goodToKnow.length > 0 ? (
-          <div className="grid gap-3">
-            {goodToKnow.map((item) => (
-              <DigestItem
-                key={digestEvidenceKey(item.claims.map(({ id }) => id))}
-                item={item}
-                householdChildren={householdChildren}
-                communications={communications}
-                actions={[
-                  {
-                    label: "Dismiss",
-                    icon: <EyeOffIcon />,
-                    variant: "outline",
-                    onClick: () => onDismissedChange(item, true),
-                    pending:
-                      digestEvidenceKey(item.claims.map(({ id }) => id)) ===
-                      pendingDismissedItemKey,
-                  },
-                ]}
-              />
-            ))}
-          </div>
-        ) : (
-          <EmptySection>No other updates.</EmptySection>
-        )}
-      </DigestSection>
+      </section>
 
       {completedItems.length > 0 ? (
-        <DigestSection
-          title="Completed"
-          description="Responsibilities already handled."
-          icon={<CheckIcon />}
-        >
+        <section aria-labelledby="completed-heading">
+          <div className="mb-3">
+            <h2 id="completed-heading" className="font-semibold tracking-tight">
+              Completed
+            </h2>
+            <p className="text-sm text-muted-foreground">Responsibilities already handled.</p>
+          </div>
           <div className="grid gap-3">
-            {completedItems.map((item) => (
+            {completedItems.map(({ item, category }) => (
               <DigestItem
                 key={digestEvidenceKey(item.claims.map(({ id }) => id))}
                 item={item}
+                category={category}
                 householdChildren={householdChildren}
                 communications={communications}
+                detail={formatItemDate(item)}
                 actions={[
                   {
                     label: "Reopen",
@@ -370,7 +381,7 @@ function HouseholdDigest({
               />
             ))}
           </div>
-        </DigestSection>
+        </section>
       ) : null}
 
       {dismissedItems.length > 0 ? (
@@ -387,6 +398,13 @@ function HouseholdDigest({
 }
 
 type DigestItemType = Digest["actNow"][number];
+type DigestCategory = "actNow" | "comingUp" | "goodToKnow";
+type CategorizedDigestItem = { item: DigestItemType; category: DigestCategory };
+const categoryLabels: Record<DigestCategory, string> = {
+  actNow: "Act Now",
+  comingUp: "Coming Up",
+  goodToKnow: "Good to Know",
+};
 type DigestItemAction = {
   label: string;
   icon: React.ReactNode;
@@ -397,12 +415,14 @@ type DigestItemAction = {
 
 function DigestItem({
   item,
+  category,
   householdChildren,
   communications,
   detail,
   actions = [],
 }: {
   item: DigestItemType;
+  category: DigestCategory;
   householdChildren: Array<{ id: string; displayName: string }>;
   communications: SchoolCommunication[];
   detail?: string;
@@ -416,6 +436,9 @@ function DigestItem({
     <article className="overflow-hidden rounded-2xl border bg-card shadow-sm">
       <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6">
         <div className="min-w-0 space-y-2">
+          <span className="inline-flex rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+            {categoryLabels[category]}
+          </span>
           <h3 className="font-semibold tracking-tight">{item.title}</h3>
           {detail ? <p className="text-sm text-muted-foreground">{detail}</p> : null}
           <p className="text-xs font-medium text-muted-foreground">
@@ -451,7 +474,7 @@ function DismissedDigestItems({
   pendingDismissedItemKey,
   onReopen,
 }: {
-  items: DigestItemType[];
+  items: CategorizedDigestItem[];
   householdChildren: Array<{ id: string; displayName: string }>;
   communications: SchoolCommunication[];
   pendingDismissedItemKey?: string;
@@ -472,10 +495,11 @@ function DismissedDigestItems({
         <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
       </summary>
       <div className="grid gap-3 border-t bg-muted/20 p-4 sm:p-6">
-        {items.map((item) => (
+        {items.map(({ item, category }) => (
           <DigestItem
             key={digestEvidenceKey(item.claims.map(({ id }) => id))}
             item={item}
+            category={category}
             householdChildren={householdChildren}
             communications={communications}
             detail={formatItemDate(item)}
@@ -578,34 +602,6 @@ function HighlightedSource({
   ));
 }
 
-function DigestSection({
-  title,
-  description,
-  icon,
-  children,
-}: {
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  const headingId = `${title.toLocaleLowerCase("en-GB").replaceAll(" ", "-")}-heading`;
-  return (
-    <section aria-labelledby={headingId}>
-      <div className="mb-3 flex items-center gap-3">
-        <span className="text-muted-foreground [&_svg]:size-5">{icon}</span>
-        <div>
-          <h2 id={headingId} className="font-semibold tracking-tight">
-            {title}
-          </h2>
-          <p className="text-sm text-muted-foreground">{description}</p>
-        </div>
-      </div>
-      {children}
-    </section>
-  );
-}
-
 function EmptySection({ children }: { children: React.ReactNode }) {
   return (
     <div className="rounded-2xl border border-dashed bg-background px-5 py-6 text-sm text-muted-foreground">
@@ -619,8 +615,26 @@ function formatNames(names: string[]) {
   return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 }
 
-function formatItemDate(item: Digest["comingUp"][number]) {
-  const date = item.claims.find(({ date }) => date?.resolvedDate)?.date?.resolvedDate;
+function itemDate(item: DigestItemType) {
+  return [
+    ...item.responsibilities.flatMap(({ dueDate }) => dueDate?.resolvedDate ?? []),
+    ...item.claims.flatMap(({ date }) => date?.resolvedDate ?? []),
+  ].sort()[0];
+}
+
+function sortDigestItems(items: CategorizedDigestItem[]) {
+  return [...items].sort((left, right) => {
+    const leftDate = itemDate(left.item);
+    const rightDate = itemDate(right.item);
+    if (leftDate && rightDate) return leftDate.localeCompare(rightDate);
+    if (leftDate) return -1;
+    if (rightDate) return 1;
+    return left.item.title.localeCompare(right.item.title, "en-GB");
+  });
+}
+
+function formatItemDate(item: DigestItemType) {
+  const date = itemDate(item);
   return date ? formatDate(date) : undefined;
 }
 
