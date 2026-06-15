@@ -87,6 +87,11 @@ _Avoid_: Source link, footnote, evidence score
 A conversation in which Comms Digest answers from stored **Claims**, **Responsibilities**, **Citations**, and relevant **School Communications**. It refuses questions that cannot be supported and requires confirmation before causing any external change.
 _Avoid_: Chatbot, general assistant, Q&A
 
+**Household Routine**:
+Structured recurring information entered by the **Household Owner** when it may not appear in a **School Communication**, such as PE days, clubs, or library days. A **Household Routine** applies to one or more **Students**, may be associated with a **School**, repeats on selected weekdays, and may have start and end dates.
+The next occurrence appears in the **Digest**, while **Grounded Chat** can use the full recurring pattern. It remains clearly identified as Household-added information and is never represented as a **School Communication**, **Claim**, or **Citation**.
+_Avoid_: Manual Claim, recurring School Communication, calendar event
+
 ## Example Dialogue
 
 **Household Owner:** Did anything important come in from school this week?

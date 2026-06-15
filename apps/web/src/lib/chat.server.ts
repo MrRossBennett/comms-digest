@@ -13,11 +13,20 @@ import {
   schoolCommunication,
   schoolCommunicationChild,
 } from "@repo/db/schema";
-import type { GroundedChatEvidence } from "@repo/intelligence";
+import { formatRoutineSchedule, type GroundedChatEvidence } from "@repo/intelligence";
 import { and, eq, isNull, or } from "drizzle-orm";
 
+import { listHouseholdRoutinesForOwner } from "./household-routine.server";
+
 export async function listGroundedChatEvidence(userId: string) {
-  const [rows, householdChildren, communicationChildren, responsibilityRows] = await Promise.all([
+  const [
+    rows,
+    householdChildren,
+    householdSchools,
+    communicationChildren,
+    responsibilityRows,
+    routines,
+  ] = await Promise.all([
     db
       .select({
         id: citation.id,
@@ -60,6 +69,14 @@ export async function listGroundedChatEvidence(userId: string) {
       .where(eq(household.ownerUserId, userId)),
     db
       .select({
+        id: school.id,
+        name: school.name,
+      })
+      .from(school)
+      .innerJoin(household, eq(school.householdId, household.id))
+      .where(eq(household.ownerUserId, userId)),
+    db
+      .select({
         communicationId: schoolCommunicationChild.communicationId,
         childId: schoolCommunicationChild.childId,
       })
@@ -97,9 +114,10 @@ export async function listGroundedChatEvidence(userId: string) {
           ),
         ),
       ),
+    listHouseholdRoutinesForOwner(userId),
   ]);
 
-  return rows.map((row): GroundedChatEvidence => {
+  const communicationEvidence = rows.map((row): GroundedChatEvidence => {
     const directlyScopedChildIds = communicationChildren
       .filter(({ communicationId }) => communicationId === row.communicationId)
       .map(({ childId }) => childId);
@@ -138,4 +156,34 @@ export async function listGroundedChatEvidence(userId: string) {
         })),
     };
   });
+
+  const routineEvidence = routines.map((routine): GroundedChatEvidence => {
+    const studentNames = householdChildren
+      .filter(({ id }) => routine.studentIds.includes(id))
+      .map(({ displayName }) => displayName);
+    const schedule = formatRoutineSchedule(routine.weekdays);
+    const schoolName = householdSchools.find(({ id }) => id === routine.schoolId)?.name;
+    const dateBoundary = [
+      routine.startDate ? `from ${routine.startDate}` : undefined,
+      routine.endDate ? `until ${routine.endDate}` : undefined,
+    ]
+      .filter(Boolean)
+      .join(" ");
+    const claim = `${routine.title} happens every ${schedule}${dateBoundary ? ` ${dateBoundary}` : ""}.${routine.details ? ` ${routine.details}` : ""}`;
+
+    return {
+      id: `routine:${routine.id}`,
+      claim,
+      citation: claim,
+      subject: routine.title,
+      receivedAt: routine.updatedAt,
+      senderAddress: "Household-added Routine",
+      schoolName,
+      audience: studentNames.join(", "),
+      studentNames,
+      responsibilities: [],
+    };
+  });
+
+  return [...communicationEvidence, ...routineEvidence];
 }

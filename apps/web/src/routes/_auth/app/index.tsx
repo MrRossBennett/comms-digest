@@ -1,4 +1,11 @@
-import type { Digest, SchoolCommunication, ValidatedExtraction } from "@repo/intelligence";
+import {
+  formatRoutineSchedule,
+  nextRoutineOccurrence,
+  type Digest,
+  type HouseholdRoutine,
+  type SchoolCommunication,
+  type ValidatedExtraction,
+} from "@repo/intelligence";
 import { Button } from "@repo/ui/components/button";
 import { useMutation } from "@tanstack/react-query";
 import { createFileRoute, Link, redirect, useRouter } from "@tanstack/react-router";
@@ -11,6 +18,7 @@ import {
   EyeOffIcon,
   PencilIcon,
   RefreshCwIcon,
+  Repeat2Icon,
   RotateCcwIcon,
   Settings2Icon,
 } from "lucide-react";
@@ -25,19 +33,24 @@ import {
   $setHouseholdDigestItemDismissed,
   $setHouseholdResponsibilityCompleted,
 } from "#/lib/household-digest.functions";
+import { $listHouseholdRoutines } from "#/lib/household-routine.functions";
 import { $getHousehold } from "#/lib/household.functions";
 
 export const Route = createFileRoute("/_auth/app/")({
   loader: async () => {
-    const [household, digestData] = await Promise.all([$getHousehold(), $getHouseholdDigest()]);
+    const [household, digestData, routines] = await Promise.all([
+      $getHousehold(),
+      $getHouseholdDigest(),
+      $listHouseholdRoutines(),
+    ]);
     if (!household) throw redirect({ to: "/app/onboarding" });
-    return { household, digestData };
+    return { household, digestData, routines };
   },
   component: HouseholdHome,
 });
 
 function HouseholdHome() {
-  const { household, digestData } = Route.useLoaderData();
+  const { household, digestData, routines } = Route.useLoaderData();
   const router = useRouter();
   const fetchMutation = useMutation({
     mutationFn: $fetchNewCommunications,
@@ -111,6 +124,10 @@ function HouseholdHome() {
             <Settings2Icon />
             Sources
           </Button>
+          <Button variant="outline" render={<Link to="/app/routines" />} nativeButton={false}>
+            <Repeat2Icon />
+            Routines
+          </Button>
           <Button
             variant="outline"
             size="icon"
@@ -128,14 +145,15 @@ function HouseholdHome() {
         </p>
       ) : null}
 
-      {digestData?.digest ? (
+      {digestData?.digest || routines.length > 0 ? (
         <HouseholdDigest
-          digest={digestData.digest}
-          communications={digestData.communications}
+          digest={digestData?.digest ?? { actNow: [], comingUp: [], goodToKnow: [] }}
+          routines={routines}
+          communications={digestData?.communications ?? []}
           householdChildren={household.children}
-          completedResponsibilityIds={digestData.completedResponsibilityIds}
-          dismissedClaimIds={digestData.dismissedClaimIds}
-          dismissedResponsibilityIds={digestData.dismissedResponsibilityIds}
+          completedResponsibilityIds={digestData?.completedResponsibilityIds ?? []}
+          dismissedClaimIds={digestData?.dismissedClaimIds ?? []}
+          dismissedResponsibilityIds={digestData?.dismissedResponsibilityIds ?? []}
           pendingResponsibilityId={
             statusMutation.isPending ? statusMutation.variables?.responsibilityId : undefined
           }
@@ -189,6 +207,7 @@ function EmptyDigest() {
 
 function HouseholdDigest({
   digest,
+  routines,
   communications,
   householdChildren,
   completedResponsibilityIds,
@@ -200,6 +219,7 @@ function HouseholdDigest({
   onDismissedChange,
 }: {
   digest: Digest;
+  routines: HouseholdRoutine[];
   communications: SchoolCommunication[];
   householdChildren: Array<{ id: string; displayName: string; schoolYear: string }>;
   completedResponsibilityIds: string[];
@@ -224,6 +244,10 @@ function HouseholdDigest({
     ...digest.comingUp.map((item) => ({ item, category: "comingUp" as const })),
     ...digest.goodToKnow.map((item) => ({ item, category: "goodToKnow" as const })),
   ];
+  const routineOccurrences: RoutineOccurrence[] = routines.flatMap((routine) => {
+    const date = nextRoutineOccurrence(routine, todayInLondon());
+    return date ? [{ routine, date }] : [];
+  });
   const dismissedItems = sortDigestItems(
     categorizedItems.filter(
       ({ item, category }) =>
@@ -243,7 +267,7 @@ function HouseholdDigest({
         item.responsibilities.every(({ id }) => completed.has(id)),
     ),
   );
-  const activeItems = sortDigestItems(
+  const activeDigestItems = sortDigestItems(
     categorizedItems.filter(({ item, category }) => {
       if (!appliesToSelectedStudent(item) || isDismissed(item)) return false;
       if (selectedCategory !== "all" && category !== selectedCategory) return false;
@@ -251,6 +275,15 @@ function HouseholdDigest({
       return item.responsibilities.some(({ id }) => !completed.has(id));
     }),
   );
+  const visibleRoutineOccurrences = routineOccurrences.filter(
+    ({ routine }) =>
+      (!selectedChildId || routine.studentIds.includes(selectedChildId)) &&
+      (selectedCategory === "all" || selectedCategory === "comingUp"),
+  );
+  const activeItems = sortTimelineItems([
+    ...activeDigestItems.map((value) => ({ kind: "digest" as const, value })),
+    ...visibleRoutineOccurrences.map((value) => ({ kind: "routine" as const, value })),
+  ]);
 
   return (
     <div className="grid gap-8">
@@ -308,41 +341,51 @@ function HouseholdDigest({
         </div>
         {activeItems.length > 0 ? (
           <div className="grid gap-3">
-            {activeItems.map(({ item, category }) => (
-              <DigestItem
-                key={digestEvidenceKey(item.claims.map(({ id }) => id))}
-                item={item}
-                category={category}
-                householdChildren={householdChildren}
-                communications={communications}
-                detail={formatItemDate(item)}
-                actions={[
-                  {
-                    label: "Dismiss",
-                    icon: <EyeOffIcon />,
-                    variant: "outline",
-                    onClick: () => onDismissedChange(item, true),
-                    pending:
-                      digestEvidenceKey(item.claims.map(({ id }) => id)) ===
-                      pendingDismissedItemKey,
-                  },
-                  ...(category === "actNow"
-                    ? [
-                        {
-                          label: "Mark completed",
-                          icon: <CheckIcon />,
-                          variant: "default" as const,
-                          onClick: () => {
-                            const responsibility = item.responsibilities[0];
-                            if (responsibility) onStatusChange(responsibility.id, true);
+            {activeItems.map((timelineItem) =>
+              timelineItem.kind === "routine" ? (
+                <RoutineOccurrenceItem
+                  key={`routine:${timelineItem.value.routine.id}`}
+                  occurrence={timelineItem.value}
+                  householdChildren={householdChildren}
+                />
+              ) : (
+                <DigestItem
+                  key={digestEvidenceKey(timelineItem.value.item.claims.map(({ id }) => id))}
+                  item={timelineItem.value.item}
+                  category={timelineItem.value.category}
+                  householdChildren={householdChildren}
+                  communications={communications}
+                  detail={formatItemDate(timelineItem.value.item)}
+                  actions={[
+                    {
+                      label: "Dismiss",
+                      icon: <EyeOffIcon />,
+                      variant: "outline",
+                      onClick: () => onDismissedChange(timelineItem.value.item, true),
+                      pending:
+                        digestEvidenceKey(timelineItem.value.item.claims.map(({ id }) => id)) ===
+                        pendingDismissedItemKey,
+                    },
+                    ...(timelineItem.value.category === "actNow"
+                      ? [
+                          {
+                            label: "Mark completed",
+                            icon: <CheckIcon />,
+                            variant: "default" as const,
+                            onClick: () => {
+                              const responsibility = timelineItem.value.item.responsibilities[0];
+                              if (responsibility) onStatusChange(responsibility.id, true);
+                            },
+                            pending:
+                              timelineItem.value.item.responsibilities[0]?.id ===
+                              pendingResponsibilityId,
                           },
-                          pending: item.responsibilities[0]?.id === pendingResponsibilityId,
-                        },
-                      ]
-                    : []),
-                ]}
-              />
-            ))}
+                        ]
+                      : []),
+                  ]}
+                />
+              ),
+            )}
           </div>
         ) : (
           <EmptySection>No Digest items match these filters.</EmptySection>
@@ -400,6 +443,10 @@ function HouseholdDigest({
 type DigestItemType = Digest["actNow"][number];
 type DigestCategory = "actNow" | "comingUp" | "goodToKnow";
 type CategorizedDigestItem = { item: DigestItemType; category: DigestCategory };
+type RoutineOccurrence = { routine: HouseholdRoutine; date: string };
+type TimelineItem =
+  | { kind: "digest"; value: CategorizedDigestItem }
+  | { kind: "routine"; value: RoutineOccurrence };
 const categoryLabels: Record<DigestCategory, string> = {
   actNow: "Act Now",
   comingUp: "Coming Up",
@@ -463,6 +510,43 @@ function DigestItem({
         ) : null}
       </div>
       <SourceDisclosure communications={communications} claims={item.claims} />
+    </article>
+  );
+}
+
+function RoutineOccurrenceItem({
+  occurrence,
+  householdChildren,
+}: {
+  occurrence: RoutineOccurrence;
+  householdChildren: Array<{ id: string; displayName: string }>;
+}) {
+  const names = householdChildren
+    .filter(({ id }) => occurrence.routine.studentIds.includes(id))
+    .map(({ displayName }) => displayName);
+
+  return (
+    <article className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+      <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6">
+        <div className="min-w-0 space-y-2">
+          <span className="inline-flex rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+            Household Routine
+          </span>
+          <h3 className="font-semibold tracking-tight">{occurrence.routine.title}</h3>
+          <p className="text-sm text-muted-foreground">{formatDate(occurrence.date)}</p>
+          <p className="text-xs font-medium text-muted-foreground">
+            Applies to {formatNames(names)} · Every{" "}
+            {formatRoutineSchedule(occurrence.routine.weekdays)}
+          </p>
+          {occurrence.routine.details ? (
+            <p className="text-sm leading-6">{occurrence.routine.details}</p>
+          ) : null}
+        </div>
+        <Button variant="outline" render={<Link to="/app/routines" />} nativeButton={false}>
+          <PencilIcon />
+          Edit Routine
+        </Button>
+      </div>
     </article>
   );
 }
@@ -631,6 +715,29 @@ function sortDigestItems(items: CategorizedDigestItem[]) {
     if (rightDate) return 1;
     return left.item.title.localeCompare(right.item.title, "en-GB");
   });
+}
+
+function sortTimelineItems(items: TimelineItem[]) {
+  return [...items].sort((left, right) => {
+    const leftDate = left.kind === "routine" ? left.value.date : itemDate(left.value.item);
+    const rightDate = right.kind === "routine" ? right.value.date : itemDate(right.value.item);
+    if (leftDate && rightDate) return leftDate.localeCompare(rightDate);
+    if (leftDate) return -1;
+    if (rightDate) return 1;
+    const leftTitle = left.kind === "routine" ? left.value.routine.title : left.value.item.title;
+    const rightTitle =
+      right.kind === "routine" ? right.value.routine.title : right.value.item.title;
+    return leftTitle.localeCompare(rightTitle, "en-GB");
+  });
+}
+
+function todayInLondon() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/London",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }
 
 function formatItemDate(item: DigestItemType) {

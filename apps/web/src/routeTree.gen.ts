@@ -19,6 +19,7 @@ import { Route as AuthAppRouteRouteImport } from './routes/_auth/app/route'
 import { Route as AuthAppIndexRouteImport } from './routes/_auth/app/index'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AuthAppSourcesRouteImport } from './routes/_auth/app/sources'
+import { Route as AuthAppRoutinesRouteImport } from './routes/_auth/app/routines'
 import { Route as AuthAppOnboardingRouteImport } from './routes/_auth/app/onboarding'
 import { Route as AuthAppDemoRouteImport } from './routes/_auth/app/demo'
 import { Route as AuthAppChatRouteImport } from './routes/_auth/app/chat'
@@ -71,6 +72,11 @@ const AuthAppSourcesRoute = AuthAppSourcesRouteImport.update({
   path: '/sources',
   getParentRoute: () => AuthAppRouteRoute,
 } as any)
+const AuthAppRoutinesRoute = AuthAppRoutinesRouteImport.update({
+  id: '/routines',
+  path: '/routines',
+  getParentRoute: () => AuthAppRouteRoute,
+} as any)
 const AuthAppOnboardingRoute = AuthAppOnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
@@ -96,6 +102,7 @@ export interface FileRoutesByFullPath {
   '/app/chat': typeof AuthAppChatRoute
   '/app/demo': typeof AuthAppDemoRoute
   '/app/onboarding': typeof AuthAppOnboardingRoute
+  '/app/routines': typeof AuthAppRoutinesRoute
   '/app/sources': typeof AuthAppSourcesRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/': typeof AuthAppIndexRoute
@@ -108,6 +115,7 @@ export interface FileRoutesByTo {
   '/app/chat': typeof AuthAppChatRoute
   '/app/demo': typeof AuthAppDemoRoute
   '/app/onboarding': typeof AuthAppOnboardingRoute
+  '/app/routines': typeof AuthAppRoutinesRoute
   '/app/sources': typeof AuthAppSourcesRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app': typeof AuthAppIndexRoute
@@ -124,6 +132,7 @@ export interface FileRoutesById {
   '/_auth/app/chat': typeof AuthAppChatRoute
   '/_auth/app/demo': typeof AuthAppDemoRoute
   '/_auth/app/onboarding': typeof AuthAppOnboardingRoute
+  '/_auth/app/routines': typeof AuthAppRoutinesRoute
   '/_auth/app/sources': typeof AuthAppSourcesRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/_auth/app/': typeof AuthAppIndexRoute
@@ -139,6 +148,7 @@ export interface FileRouteTypes {
     | '/app/chat'
     | '/app/demo'
     | '/app/onboarding'
+    | '/app/routines'
     | '/app/sources'
     | '/api/auth/$'
     | '/app/'
@@ -151,6 +161,7 @@ export interface FileRouteTypes {
     | '/app/chat'
     | '/app/demo'
     | '/app/onboarding'
+    | '/app/routines'
     | '/app/sources'
     | '/api/auth/$'
     | '/app'
@@ -166,6 +177,7 @@ export interface FileRouteTypes {
     | '/_auth/app/chat'
     | '/_auth/app/demo'
     | '/_auth/app/onboarding'
+    | '/_auth/app/routines'
     | '/_auth/app/sources'
     | '/api/auth/$'
     | '/_auth/app/'
@@ -251,6 +263,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthAppSourcesRouteImport
       parentRoute: typeof AuthAppRouteRoute
     }
+    '/_auth/app/routines': {
+      id: '/_auth/app/routines'
+      path: '/routines'
+      fullPath: '/app/routines'
+      preLoaderRoute: typeof AuthAppRoutinesRouteImport
+      parentRoute: typeof AuthAppRouteRoute
+    }
     '/_auth/app/onboarding': {
       id: '/_auth/app/onboarding'
       path: '/onboarding'
@@ -279,6 +298,7 @@ interface AuthAppRouteRouteChildren {
   AuthAppChatRoute: typeof AuthAppChatRoute
   AuthAppDemoRoute: typeof AuthAppDemoRoute
   AuthAppOnboardingRoute: typeof AuthAppOnboardingRoute
+  AuthAppRoutinesRoute: typeof AuthAppRoutinesRoute
   AuthAppSourcesRoute: typeof AuthAppSourcesRoute
   AuthAppIndexRoute: typeof AuthAppIndexRoute
 }
@@ -287,6 +307,7 @@ const AuthAppRouteRouteChildren: AuthAppRouteRouteChildren = {
   AuthAppChatRoute: AuthAppChatRoute,
   AuthAppDemoRoute: AuthAppDemoRoute,
   AuthAppOnboardingRoute: AuthAppOnboardingRoute,
+  AuthAppRoutinesRoute: AuthAppRoutinesRoute,
   AuthAppSourcesRoute: AuthAppSourcesRoute,
   AuthAppIndexRoute: AuthAppIndexRoute,
 }

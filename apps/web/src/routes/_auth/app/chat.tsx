@@ -171,6 +171,11 @@ function ChatSources({ sources }: { sources: GroundedChatSource[] }) {
             <span className="font-medium text-muted-foreground">[{index + 1}]</span>
             <span className="space-y-1">
               <span className="block font-medium">{source.subject ?? source.senderAddress}</span>
+              {source.senderAddress === "Household-added Routine" ? (
+                <span className="block text-xs font-medium text-muted-foreground">
+                  Household-added Routine
+                </span>
+              ) : null}
               <span className="block leading-5 text-muted-foreground">“{source.citation}”</span>
             </span>
           </Source>

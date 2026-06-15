@@ -7,4 +7,5 @@ export * from "./digest";
 export * from "./digest-workflow";
 export * from "./grounding";
 export * from "./reconcile";
+export * from "./routine";
 export * from "./workflow";
