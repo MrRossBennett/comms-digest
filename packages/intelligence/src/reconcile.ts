@@ -162,9 +162,7 @@ export function reconcileDigest(input: unknown) {
 
     items.push({
       section: claim.date ? "coming_up" : "good_to_know",
-      title: claim.date
-        ? (communication.subject ?? withoutFullStop(claim.content))
-        : withoutFullStop(claim.content),
+      title: withoutFullStop(claim.content),
       claimIds: [claim.id],
       responsibilityIds: [],
     });

@@ -26,6 +26,7 @@ import {
 } from "@repo/intelligence";
 import { createLiveExtractor } from "@repo/intelligence/live";
 import { and, asc, eq, inArray } from "drizzle-orm";
+import { extractText } from "unpdf";
 import { z } from "zod";
 
 import { parseSender } from "./communication-source";
@@ -42,7 +43,7 @@ const gmailMessageListSchema = z.object({
 
 type GmailPart = {
   mimeType?: string;
-  body?: { data?: string };
+  body?: { data?: string; attachmentId?: string };
   headers?: Array<{ name: string; value: string }>;
   parts?: GmailPart[];
 };
@@ -50,7 +51,7 @@ type GmailPart = {
 const gmailPartSchema: z.ZodType<GmailPart> = z.lazy(() =>
   z.object({
     mimeType: z.string().optional(),
-    body: z.object({ data: z.string().optional() }).optional(),
+    body: z.object({ data: z.string().optional(), attachmentId: z.string().optional() }).optional(),
     headers: z.array(z.object({ name: z.string(), value: z.string() })).optional(),
     parts: z.array(gmailPartSchema).optional(),
   }),
@@ -404,7 +405,28 @@ async function fetchGmailCandidates(
     )?.value;
     const sender = fromHeader ? parseSender(fromHeader) : null;
     if (!sender || sender.senderDomain !== source.senderDomain) continue;
-    const sourceText = extractGmailText(message.payload);
+    const emailBodyText = extractGmailText(message.payload);
+    const pdfParts = collectPdfParts(message.payload);
+    const pdfSections: string[] = [];
+    for (const pdfPart of pdfParts) {
+      const data =
+        pdfPart.body?.data ??
+        (pdfPart.body?.attachmentId
+          ? await downloadGmailAttachment(message.id, pdfPart.body.attachmentId, accessToken)
+          : null);
+      if (!data) continue;
+      const filename = pdfPart.headers
+        ?.find(({ name }) => name.toLowerCase() === "content-disposition")
+        ?.value.match(/filename[^;=\n]*=\s*["']?([^"';\n]*)["']?/i)?.[1]
+        ?.trim();
+      const text = await extractPdfText(data);
+      if (text) pdfSections.push(`--- Attachment: ${filename ?? "attachment.pdf"} ---\n\n${text}`);
+    }
+
+    const sourceText =
+      emailBodyText || pdfSections.length > 0
+        ? [emailBodyText, ...pdfSections].filter(Boolean).join("\n\n")
+        : null;
     if (!sourceText) continue;
 
     candidates.push({
@@ -752,4 +774,43 @@ function extractGmailText(payload: z.infer<typeof gmailPartSchema>) {
 
 function decodeBase64Url(value: string) {
   return Buffer.from(value.replaceAll("-", "+").replaceAll("_", "/"), "base64").toString("utf8");
+}
+
+function collectPdfParts(payload: z.infer<typeof gmailPartSchema>) {
+  const parts: z.infer<typeof gmailPartSchema>[] = [];
+  const visit = (part: z.infer<typeof gmailPartSchema>) => {
+    if (part.mimeType === "application/pdf" && (part.body?.data || part.body?.attachmentId)) {
+      parts.push(part);
+    }
+    part.parts?.forEach(visit);
+  };
+  visit(payload);
+  return parts;
+}
+
+async function downloadGmailAttachment(
+  messageId: string,
+  attachmentId: string,
+  accessToken: string,
+): Promise<string | null> {
+  const response = z
+    .object({ data: z.string() })
+    .safeParse(
+      await gmailRequest(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/attachments/${attachmentId}`,
+        accessToken,
+      ),
+    );
+  return response.success ? response.data.data : null;
+}
+
+async function extractPdfText(base64UrlData: string): Promise<string | null> {
+  try {
+    const buffer = Buffer.from(base64UrlData.replaceAll("-", "+").replaceAll("_", "/"), "base64");
+    const { text } = await extractText(new Uint8Array(buffer), { mergePages: true });
+    const cleaned = text.replaceAll("\r\n", "\n").replaceAll("\r", "\n").trim();
+    return cleaned || null;
+  } catch {
+    return null;
+  }
 }
