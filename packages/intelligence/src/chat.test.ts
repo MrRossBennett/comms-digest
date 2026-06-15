@@ -95,6 +95,32 @@ test("drops weak partial matches when one source strongly matches the question",
   ).toEqual(["concert"]);
 });
 
+test("does not match short routine terms inside unrelated words", () => {
+  const routineEvidence: GroundedChatEvidence[] = [
+    {
+      ...evidence[0]!,
+      id: "routine",
+      claim: "PE happens every Tuesday and Thursday.",
+      subject: "PE",
+      citation: "PE happens every Tuesday and Thursday.",
+      studentNames: ["Grace"],
+    },
+    {
+      ...evidence[1]!,
+      id: "performance",
+      claim: "Academic performance updates are provided.",
+      subject: "Performance updates",
+      citation: "Academic performance updates are provided.",
+      studentNames: ["Grace"],
+      responsibilities: [],
+    },
+  ];
+
+  expect(
+    selectChatEvidence("When does Grace have PE?", routineEvidence).map(({ id }) => id),
+  ).toEqual(["routine"]);
+});
+
 test("reads the latest user text from AI SDK messages", () => {
   const messages: GroundedChatMessage[] = [
     { id: "1", role: "user", parts: [{ type: "text", text: "First question" }] },

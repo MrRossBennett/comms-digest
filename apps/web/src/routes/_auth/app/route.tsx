@@ -18,6 +18,7 @@ import {
   MailIcon,
   MenuIcon,
   MessageCircleIcon,
+  Repeat2Icon,
   SparklesIcon,
   UserIcon,
 } from "lucide-react";
@@ -53,6 +54,15 @@ function AppLayout() {
               >
                 <MessageCircleIcon />
                 Chat
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                render={<Link to="/app/routines" />}
+                nativeButton={false}
+              >
+                <Repeat2Icon />
+                Routines
               </Button>
               <Button
                 variant="ghost"
@@ -106,6 +116,10 @@ function MobileNavigation() {
         <DropdownMenuItem render={<Link to="/app/chat" />}>
           <MessageCircleIcon />
           Chat
+        </DropdownMenuItem>
+        <DropdownMenuItem render={<Link to="/app/routines" />}>
+          <Repeat2Icon />
+          Routines
         </DropdownMenuItem>
         <DropdownMenuItem render={<Link to="/app/demo" />}>
           <SparklesIcon />

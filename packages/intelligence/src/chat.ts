@@ -132,8 +132,7 @@ function evidenceScore(terms: string[], evidence: GroundedChatEvidence) {
     (total, term) =>
       total +
       fields.reduce(
-        (score, field) =>
-          score + (field.value.toLocaleLowerCase("en-GB").includes(term) ? field.weight : 0),
+        (score, field) => score + (normalizedTerms(field.value).includes(term) ? field.weight : 0),
         0,
       ),
     0,
