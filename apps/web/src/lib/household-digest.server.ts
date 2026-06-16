@@ -74,24 +74,29 @@ type IngestionCandidate = {
   recordedExtraction?: z.infer<typeof modelExtractionSchema>;
 };
 
-export async function fetchNewCommunicationsForOwner(ownerUserId: string) {
+// Shared fetch+ingest+rebuild core. Used by manual refresh, Inngest sweep, and backfill.
+// paginate:true bypasses the per-sweep cap (backfill within 30d window).
+export async function fetchAndIngestForHousehold(
+  householdId: string,
+  ownerUserId: string,
+  opts: { paginate: boolean },
+): Promise<{ messagesExtracted: number; inputTokens: number; outputTokens: number }> {
   const householdSetup = await getHouseholdForOwner(ownerUserId);
-  if (!householdSetup) throw new Error("Complete Household setup before fetching communications");
-
-  const sources = await listConfirmedSources(householdSetup.id);
-  if (sources.length === 0) {
-    throw new Error("Confirm at least one Communication Source first");
+  if (!householdSetup || householdSetup.id !== householdId) {
+    throw new Error("Household not found");
   }
 
+  const sources = await listConfirmedSources(householdId);
   const sampleCandidates = sources
     .filter(({ discovery }) => discovery === "sample")
     .map((source) => createSampleCandidate(source, householdSetup.children));
   const gmailSources = sources.filter(({ discovery }) => discovery === "gmail");
   const gmailCandidates =
     gmailSources.length > 0
-      ? await fetchGmailCandidates(ownerUserId, householdSetup.id, gmailSources)
+      ? await fetchGmailCandidates(ownerUserId, householdId, gmailSources, opts)
       : [];
   const candidates = [...sampleCandidates, ...gmailCandidates];
+
   const existingExternalIds =
     candidates.length === 0
       ? []
@@ -100,7 +105,7 @@ export async function fetchNewCommunicationsForOwner(ownerUserId: string) {
           .from(schoolCommunication)
           .where(
             and(
-              eq(schoolCommunication.householdId, householdSetup.id),
+              eq(schoolCommunication.householdId, householdId),
               inArray(
                 schoolCommunication.externalMessageId,
                 candidates.map(({ externalMessageId }) => externalMessageId),
@@ -112,36 +117,69 @@ export async function fetchNewCommunicationsForOwner(ownerUserId: string) {
     ({ externalMessageId }) => !existing.has(externalMessageId),
   );
 
-  let importedCount = 0;
-  let ingestionError: unknown;
+  const liveExtractor = createLiveExtractor({ apiKey: process.env.ANTHROPIC_API_KEY });
+  let messagesExtracted = 0;
+  let inputTokens = 0;
+  let outputTokens = 0;
+
   for (const candidate of newCandidates) {
+    await ingestCandidate(householdId, candidate, liveExtractor.extract);
+    messagesExtracted += 1;
     try {
-      await ingestCandidate(householdSetup.id, candidate);
-      importedCount += 1;
-    } catch (error) {
-      ingestionError = error;
-      break;
+      const meta = liveExtractor.getLastRunMetadata();
+      inputTokens += meta.inputTokens;
+      outputTokens += meta.outputTokens;
+    } catch {
+      // Sample/recorded extraction: no live model metadata
     }
   }
 
-  await rebuildHouseholdDigest(householdSetup.id, householdSetup);
+  await rebuildHouseholdDigest(householdId, householdSetup);
+  return { messagesExtracted, inputTokens, outputTokens };
+}
 
-  if (ingestionError) {
-    const detail = getErrorMessage(
-      ingestionError,
-      "A communication could not be processed by the extraction service.",
-    );
-    throw new Error(
-      importedCount === 0
-        ? detail
-        : `Added ${importedCount} ${importedCount === 1 ? "communication" : "communications"}, then stopped: ${detail}`,
-    );
+export async function fetchNewCommunicationsForOwner(
+  ownerUserId: string,
+): Promise<
+  | {
+      importedCount: number;
+      syncing: false;
+      digest: Awaited<ReturnType<typeof getHouseholdDigestForOwner>>;
+    }
+  | { syncing: true }
+> {
+  const householdSetup = await getHouseholdForOwner(ownerUserId);
+  if (!householdSetup) throw new Error("Complete Household setup before fetching communications");
+
+  const { tryMarkHouseholdSyncRunning, markHouseholdSyncIdle } =
+    await import("./household-sync.server");
+
+  const acquired = await tryMarkHouseholdSyncRunning(householdSetup.id);
+  if (!acquired) {
+    // A background sweep is already covering this Household.
+    // Client should poll $getHouseholdSyncState until status === 'idle', then refetch.
+    return { syncing: true };
   }
 
-  return {
-    importedCount,
-    digest: await getHouseholdDigestForOwner(ownerUserId),
-  };
+  try {
+    const result = await fetchAndIngestForHousehold(householdSetup.id, ownerUserId, {
+      paginate: false,
+    });
+    await markHouseholdSyncIdle(householdSetup.id, { success: true, ...result });
+    return {
+      syncing: false,
+      importedCount: result.messagesExtracted,
+      digest: await getHouseholdDigestForOwner(ownerUserId),
+    };
+  } catch (error) {
+    const { isRootCauseReauth } = await import("./sync-error");
+    await markHouseholdSyncIdle(householdSetup.id, {
+      success: false,
+      error: getErrorMessage(error, "Sync failed"),
+      needsReauth: isRootCauseReauth(error),
+    });
+    throw error;
+  }
 }
 
 export async function getHouseholdDigestForOwner(ownerUserId: string) {
@@ -328,10 +366,15 @@ function citationFor(sourceText: string, quote: string) {
   return { quote, start, end: start + quote.length };
 }
 
+const gmailPagedListSchema = gmailMessageListSchema.extend({
+  nextPageToken: z.string().optional(),
+});
+
 async function fetchGmailCandidates(
   ownerUserId: string,
   householdId: string,
   sources: ConfirmedSource[],
+  opts: { paginate: boolean },
 ) {
   const [googleAccount] = await db
     .select({
@@ -344,14 +387,22 @@ async function fetchGmailCandidates(
     .limit(1);
 
   if (!googleAccount?.scope?.includes("https://www.googleapis.com/auth/gmail.readonly")) {
-    throw new Error("Reconnect Gmail with read-only access before fetching communications");
+    const err = Object.assign(
+      new Error("Reconnect Gmail with read-only access before fetching communications"),
+      { needsReauth: true },
+    );
+    throw err;
   }
   if (
     googleAccount.accessTokenExpiresAt &&
     googleAccount.accessTokenExpiresAt <= new Date() &&
     !googleAccount.refreshToken
   ) {
-    throw new Error("Your Gmail connection has expired. Reconnect Gmail from Sources.");
+    const err = Object.assign(
+      new Error("Your Gmail connection has expired. Reconnect Gmail from Sources."),
+      { needsReauth: true },
+    );
+    throw err;
   }
 
   const { accessToken } = await auth.api.getAccessToken({
@@ -360,13 +411,21 @@ async function fetchGmailCandidates(
   const listedMessages: Array<{ id: string; source: ConfirmedSource }> = [];
 
   for (const source of sources) {
-    const list = gmailMessageListSchema.parse(
-      await gmailRequest(
-        `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=20&q=${encodeURIComponent(`newer_than:30d from:${source.senderDomain}`)}`,
-        accessToken,
-      ),
-    );
-    listedMessages.push(...(list.messages ?? []).map(({ id }) => ({ id, source })));
+    // In paginate mode (backfill), follow nextPageToken to collect all messages within the
+    // 30d window. In steady-state, one page of 20 results is enough before deduplication.
+    let pageToken: string | undefined;
+    const MAX_PAGES = opts.paginate ? 50 : 1;
+    let page = 0;
+    do {
+      const url = new URL("https://gmail.googleapis.com/gmail/v1/users/me/messages");
+      url.searchParams.set("maxResults", "100");
+      url.searchParams.set("q", `newer_than:30d from:${source.senderDomain}`);
+      if (pageToken) url.searchParams.set("pageToken", pageToken);
+      const list = gmailPagedListSchema.parse(await gmailRequest(url.toString(), accessToken));
+      listedMessages.push(...(list.messages ?? []).map(({ id }) => ({ id, source })));
+      pageToken = list.nextPageToken;
+      page += 1;
+    } while (pageToken && page < MAX_PAGES);
   }
 
   const existingExternalIds =
@@ -384,10 +443,17 @@ async function fetchGmailCandidates(
               ),
             ),
           );
-  const messagesToFetch = selectNewGmailMessages(
-    listedMessages,
-    new Set(existingExternalIds.map(({ externalMessageId }) => externalMessageId)),
-  );
+
+  // Steady-state: apply the per-sweep cap after deduplication.
+  // Backfill (paginate:true): no cap — process everything within the 30d window.
+  const messagesToFetch = opts.paginate
+    ? listedMessages.filter(
+        ({ id }) => !existingExternalIds.some(({ externalMessageId }) => externalMessageId === id),
+      )
+    : selectNewGmailMessages(
+        listedMessages,
+        new Set(existingExternalIds.map(({ externalMessageId }) => externalMessageId)),
+      );
   const candidates: IngestionCandidate[] = [];
 
   for (const { id, source } of messagesToFetch) {
@@ -442,7 +508,11 @@ async function fetchGmailCandidates(
   return candidates;
 }
 
-async function ingestCandidate(householdId: string, candidate: IngestionCandidate) {
+async function ingestCandidate(
+  householdId: string,
+  candidate: IngestionCandidate,
+  liveExtract: ReturnType<typeof createLiveExtractor>["extract"],
+) {
   const communicationId = crypto.randomUUID();
   const communication = schoolCommunicationSchema.parse({
     id: communicationId,
@@ -455,13 +525,10 @@ async function ingestCandidate(householdId: string, candidate: IngestionCandidat
     subject: candidate.subject,
     sourceText: candidate.sourceText,
   });
-  const recordedExtraction = candidate.recordedExtraction;
-  const extract = recordedExtraction
-    ? async () => recordedExtraction
-    : createLiveExtractor({ apiKey: process.env.ANTHROPIC_API_KEY }).extract;
-  const workflow = createExtractionWorkflow({
-    extract,
-  });
+  const extract = candidate.recordedExtraction
+    ? async () => candidate.recordedExtraction!
+    : liveExtract;
+  const workflow = createExtractionWorkflow({ extract });
   const result = await workflow.invoke({ communication });
   if (!result.validated) throw new Error("Communication extraction completed without output");
 
@@ -672,7 +739,7 @@ async function loadExtractions(householdId: string) {
   });
 }
 
-async function rebuildHouseholdDigest(
+export async function rebuildHouseholdDigest(
   householdId: string,
   householdSetup: NonNullable<Awaited<ReturnType<typeof getHouseholdForOwner>>>,
 ) {

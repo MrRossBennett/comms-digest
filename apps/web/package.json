@@ -24,6 +24,7 @@
     "ai": "catalog:",
     "date-fns": "catalog:",
     "drizzle-orm": "catalog:",
+    "inngest": "catalog:",
     "lucide-react": "catalog:",
     "motion": "catalog:",
     "nanoid": "catalog:",
