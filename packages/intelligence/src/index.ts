@@ -3,6 +3,7 @@ export * from "./chat";
 export * from "./corpus-pipeline";
 export * from "./contracts";
 export * from "./dates";
+export * from "./day-plan";
 export * from "./digest";
 export * from "./digest-workflow";
 export * from "./grounding";

@@ -63,6 +63,12 @@ _Avoid_: Calendar, schedule
 The part of a **Digest** containing relevant information that requires no present action from the **Household Owner**.
 _Avoid_: Other, miscellaneous, FYI
 
+**Day Plan**:
+A projection of a **Household**'s **Digest** narrowed to a single date: what the **Household** must do, what each **Student** must bring, and what is coming up. It draws on the same evidence as the **Digest** but is anchored to one day, so a **Household Owner** can prepare for that day without piecing communications together.
+The same **Day Plan** is seen from two vantage points. Viewed in the app on the day it describes, it is the **Household Owner**'s "Today's to-dos". Composed the evening before and delivered to the **Household Owner**, it is surfaced as "For tomorrow…". When viewed live it reflects the latest evidence and resolved **Responsibilities**; when delivered, that evening's **Day Plan** is kept as a fixed record of what was sent.
+The **Digest** remains the standing, undated backlog reviewed in the app; the **Day Plan** is the dated, prepare-for-the-day view.
+_Avoid_: Daily digest, reminder, notification, tomorrow's digest
+
 **Calendar Suggestion**:
 A proposed calendar entry derived from a **School Communication** that the **Household Owner** may review, edit, and confirm. It is not a calendar event until the **Household Owner** explicitly confirms it.
 _Avoid_: Calendar event, automatic event
