@@ -6,6 +6,7 @@ import {
   type SchoolCommunication,
   type ValidatedExtraction,
 } from "@repo/intelligence";
+import { Badge } from "@repo/ui/components/badge";
 import { Button } from "@repo/ui/components/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@repo/ui/components/dialog";
 import { useMutation } from "@tanstack/react-query";
@@ -484,12 +485,14 @@ function DigestItem({
                 Completed
               </span>
             ) : null}
+            {names.map((name) => (
+              <Badge key={name} variant="outline">
+                {name}
+              </Badge>
+            ))}
           </div>
           <h3 className="font-semibold tracking-tight">{item.title}</h3>
           {detail ? <p className="text-sm text-muted-foreground">{detail}</p> : null}
-          <p className="text-xs font-medium text-muted-foreground">
-            Applies to {formatNames(names)}
-          </p>
         </div>
         <div className="flex flex-wrap items-start gap-2">
           <SourcesButton communications={communications} claims={item.claims} />
@@ -526,14 +529,20 @@ function RoutineOccurrenceItem({
     <article className="overflow-hidden rounded-2xl border bg-card shadow-sm">
       <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6">
         <div className="min-w-0 space-y-2">
-          <span className="inline-flex rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
-            Household Routine
-          </span>
+          <div className="flex flex-wrap gap-2">
+            <span className="inline-flex rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+              Household Routine
+            </span>
+            {names.map((name) => (
+              <Badge key={name} variant="outline">
+                {name}
+              </Badge>
+            ))}
+          </div>
           <h3 className="font-semibold tracking-tight">{occurrence.routine.title}</h3>
           <p className="text-sm text-muted-foreground">{formatDate(occurrence.date)}</p>
           <p className="text-xs font-medium text-muted-foreground">
-            Applies to {formatNames(names)} · Every{" "}
-            {formatRoutineSchedule(occurrence.routine.weekdays)}
+            Every {formatRoutineSchedule(occurrence.routine.weekdays)}
           </p>
           {occurrence.routine.details ? (
             <p className="text-sm leading-6">{occurrence.routine.details}</p>
@@ -700,11 +709,6 @@ function EmptySection({ children }: { children: React.ReactNode }) {
       {children}
     </div>
   );
-}
-
-function formatNames(names: string[]) {
-  if (names.length <= 1) return names[0] ?? "this Household";
-  return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 }
 
 function itemDate(item: DigestItemType) {
