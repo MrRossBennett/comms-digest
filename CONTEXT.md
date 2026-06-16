@@ -69,6 +69,10 @@ The same **Day Plan** is seen from two vantage points. Viewed in the app on the 
 The **Digest** remains the standing, undated backlog reviewed in the app; the **Day Plan** is the dated, prepare-for-the-day view.
 _Avoid_: Daily digest, reminder, notification, tomorrow's digest
 
+**Delivery Contact**:
+The verified means by which a **Household Owner** has chosen to receive their **Day Plan** away from the app, together with their explicit, revocable consent to be contacted there. A **Delivery Contact** is unverified until the **Household Owner** proves it is theirs, then opted-in until they opt out; only a verified, opted-in **Delivery Contact** receives a **Day Plan**, and opting out stops delivery without discarding the contact.
+_Avoid_: Phone number, subscription, notification setting
+
 **Calendar Suggestion**:
 A proposed calendar entry derived from a **School Communication** that the **Household Owner** may review, edit, and confirm. It is not a calendar event until the **Household Owner** explicitly confirms it.
 _Avoid_: Calendar event, automatic event
