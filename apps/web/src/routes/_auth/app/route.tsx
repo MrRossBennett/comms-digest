@@ -12,7 +12,15 @@ import {
 } from "@repo/ui/components/dropdown-menu";
 import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, useRouter } from "@tanstack/react-router";
-import { HomeIcon, LogOutIcon, MenuIcon, MessageCircleIcon, UserIcon } from "lucide-react";
+import {
+  HomeIcon,
+  InboxIcon,
+  LogOutIcon,
+  MenuIcon,
+  MessageCircleIcon,
+  Settings2Icon,
+  UserIcon,
+} from "lucide-react";
 
 import { ThemeToggle } from "#/components/theme-toggle";
 
@@ -35,7 +43,7 @@ function AppLayout() {
             <nav className="hidden items-center gap-1 sm:flex" aria-label="Main navigation">
               <Button variant="ghost" size="sm" render={<Link to="/app" />} nativeButton={false}>
                 <HomeIcon />
-                Household
+                Today's to-dos
               </Button>
               <Button
                 variant="ghost"
@@ -75,7 +83,7 @@ function MobileNavigation() {
       <DropdownMenuContent align="end" className="w-48 sm:hidden">
         <DropdownMenuItem render={<Link to="/app" />}>
           <HomeIcon />
-          Household
+          Today's to-dos
         </DropdownMenuItem>
         <DropdownMenuItem render={<Link to="/app/chat" />}>
           <MessageCircleIcon />
@@ -103,6 +111,17 @@ function AccountMenu({ name, email }: { name: string; email: string }) {
             <span className="block font-medium text-foreground">{name}</span>
             <span className="block truncate">{email}</span>
           </DropdownMenuLabel>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          <DropdownMenuItem render={<Link to="/app/digest" />}>
+            <InboxIcon />
+            Digest
+          </DropdownMenuItem>
+          <DropdownMenuItem render={<Link to="/app/sources" />}>
+            <Settings2Icon />
+            Sources
+          </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem
