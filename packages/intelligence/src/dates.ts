@@ -40,6 +40,12 @@ export function resolveRelativeDate(
   };
 }
 
+export function todayInTimezone(timezone: string, now: Date) {
+  const offsetMinutes = getTimezoneOffsetMinutes(now, timezone);
+  const localInstant = new Date(now.getTime() + offsetMinutes * 60_000);
+  return localInstant.toISOString().slice(0, 10);
+}
+
 function getTimezoneOffsetMinutes(instant: Date, timezone: string) {
   const timeZoneName = new Intl.DateTimeFormat("en-GB", {
     timeZone: timezone,

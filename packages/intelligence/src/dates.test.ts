@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 
-import { resolveRelativeDate } from "./dates";
+import { resolveRelativeDate, todayInTimezone } from "./dates";
 
 const receivedAt = "2026-06-14T09:00:00.000Z";
 const timezone = "Europe/London";
@@ -40,4 +40,12 @@ test.each([
     originalWording: wording,
     resolvedDate: null,
   });
+});
+
+test("rolls over at local midnight rather than UTC midnight during BST", () => {
+  expect(todayInTimezone("Europe/London", new Date("2026-06-14T23:30:00.000Z"))).toBe("2026-06-15");
+});
+
+test("matches the UTC date in GMT, where there is no offset", () => {
+  expect(todayInTimezone("Europe/London", new Date("2026-01-14T23:30:00.000Z"))).toBe("2026-01-14");
 });
