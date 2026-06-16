@@ -21,6 +21,7 @@ import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AuthAppSourcesRouteImport } from './routes/_auth/app/sources'
 import { Route as AuthAppRoutinesRouteImport } from './routes/_auth/app/routines'
 import { Route as AuthAppOnboardingRouteImport } from './routes/_auth/app/onboarding'
+import { Route as AuthAppDigestRouteImport } from './routes/_auth/app/digest'
 import { Route as AuthAppDemoRouteImport } from './routes/_auth/app/demo'
 import { Route as AuthAppChatRouteImport } from './routes/_auth/app/chat'
 
@@ -82,6 +83,11 @@ const AuthAppOnboardingRoute = AuthAppOnboardingRouteImport.update({
   path: '/onboarding',
   getParentRoute: () => AuthAppRouteRoute,
 } as any)
+const AuthAppDigestRoute = AuthAppDigestRouteImport.update({
+  id: '/digest',
+  path: '/digest',
+  getParentRoute: () => AuthAppRouteRoute,
+} as any)
 const AuthAppDemoRoute = AuthAppDemoRouteImport.update({
   id: '/demo',
   path: '/demo',
@@ -101,6 +107,7 @@ export interface FileRoutesByFullPath {
   '/api/chat': typeof ApiChatRoute
   '/app/chat': typeof AuthAppChatRoute
   '/app/demo': typeof AuthAppDemoRoute
+  '/app/digest': typeof AuthAppDigestRoute
   '/app/onboarding': typeof AuthAppOnboardingRoute
   '/app/routines': typeof AuthAppRoutinesRoute
   '/app/sources': typeof AuthAppSourcesRoute
@@ -114,6 +121,7 @@ export interface FileRoutesByTo {
   '/api/chat': typeof ApiChatRoute
   '/app/chat': typeof AuthAppChatRoute
   '/app/demo': typeof AuthAppDemoRoute
+  '/app/digest': typeof AuthAppDigestRoute
   '/app/onboarding': typeof AuthAppOnboardingRoute
   '/app/routines': typeof AuthAppRoutinesRoute
   '/app/sources': typeof AuthAppSourcesRoute
@@ -131,6 +139,7 @@ export interface FileRoutesById {
   '/api/chat': typeof ApiChatRoute
   '/_auth/app/chat': typeof AuthAppChatRoute
   '/_auth/app/demo': typeof AuthAppDemoRoute
+  '/_auth/app/digest': typeof AuthAppDigestRoute
   '/_auth/app/onboarding': typeof AuthAppOnboardingRoute
   '/_auth/app/routines': typeof AuthAppRoutinesRoute
   '/_auth/app/sources': typeof AuthAppSourcesRoute
@@ -147,6 +156,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/app/chat'
     | '/app/demo'
+    | '/app/digest'
     | '/app/onboarding'
     | '/app/routines'
     | '/app/sources'
@@ -160,6 +170,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/app/chat'
     | '/app/demo'
+    | '/app/digest'
     | '/app/onboarding'
     | '/app/routines'
     | '/app/sources'
@@ -176,6 +187,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/_auth/app/chat'
     | '/_auth/app/demo'
+    | '/_auth/app/digest'
     | '/_auth/app/onboarding'
     | '/_auth/app/routines'
     | '/_auth/app/sources'
@@ -277,6 +289,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthAppOnboardingRouteImport
       parentRoute: typeof AuthAppRouteRoute
     }
+    '/_auth/app/digest': {
+      id: '/_auth/app/digest'
+      path: '/digest'
+      fullPath: '/app/digest'
+      preLoaderRoute: typeof AuthAppDigestRouteImport
+      parentRoute: typeof AuthAppRouteRoute
+    }
     '/_auth/app/demo': {
       id: '/_auth/app/demo'
       path: '/demo'
@@ -297,6 +316,7 @@ declare module '@tanstack/react-router' {
 interface AuthAppRouteRouteChildren {
   AuthAppChatRoute: typeof AuthAppChatRoute
   AuthAppDemoRoute: typeof AuthAppDemoRoute
+  AuthAppDigestRoute: typeof AuthAppDigestRoute
   AuthAppOnboardingRoute: typeof AuthAppOnboardingRoute
   AuthAppRoutinesRoute: typeof AuthAppRoutinesRoute
   AuthAppSourcesRoute: typeof AuthAppSourcesRoute
@@ -306,6 +326,7 @@ interface AuthAppRouteRouteChildren {
 const AuthAppRouteRouteChildren: AuthAppRouteRouteChildren = {
   AuthAppChatRoute: AuthAppChatRoute,
   AuthAppDemoRoute: AuthAppDemoRoute,
+  AuthAppDigestRoute: AuthAppDigestRoute,
   AuthAppOnboardingRoute: AuthAppOnboardingRoute,
   AuthAppRoutinesRoute: AuthAppRoutinesRoute,
   AuthAppSourcesRoute: AuthAppSourcesRoute,
