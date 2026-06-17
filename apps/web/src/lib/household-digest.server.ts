@@ -21,6 +21,7 @@ import {
   createExtractionWorkflow,
   modelExtractionSchema,
   reconcileDigest,
+  resolveRelativeDate,
   schoolCommunicationSchema,
   validatedExtractionSchema,
 } from "@repo/intelligence";
@@ -138,9 +139,7 @@ export async function fetchAndIngestForHousehold(
   return { messagesExtracted, inputTokens, outputTokens };
 }
 
-export async function fetchNewCommunicationsForOwner(
-  ownerUserId: string,
-): Promise<
+export async function fetchNewCommunicationsForOwner(ownerUserId: string): Promise<
   | {
       importedCount: number;
       syncing: false;
@@ -667,14 +666,22 @@ async function loadExtractions(householdId: string) {
       .filter(({ communicationId }) => communicationId === communicationRow.id)
       .map(({ childId }) => childId);
 
+    // Re-resolve stored date wording on every load rather than trusting the date that was
+    // resolved at ingestion. This keeps resolution as the single source of truth, so resolver
+    // improvements reach already-stored School Communications without re-running extraction.
+    const receivedAt = communicationRow.receivedAt.toISOString();
+    const householdTimezone = "Europe/London";
+    const resolve = (originalWording: string) =>
+      resolveRelativeDate(originalWording, receivedAt, householdTimezone).resolvedDate;
+
     return validatedExtractionSchema.parse({
       communication: {
         id: communicationRow.id,
         kind: "email",
         schoolId: communicationRow.schoolId,
         sourceChildIds: communicationRow.sourceAudience === "children" ? scopedChildIds : undefined,
-        receivedAt: communicationRow.receivedAt.toISOString(),
-        householdTimezone: "Europe/London",
+        receivedAt,
+        householdTimezone,
         subject: communicationRow.subject ?? undefined,
         sourceText: communicationRow.sourceText,
       },
@@ -691,7 +698,7 @@ async function loadExtractions(householdId: string) {
           date: claim.dateOriginalWording
             ? {
                 originalWording: claim.dateOriginalWording,
-                resolvedDate: claim.dateResolved,
+                resolvedDate: resolve(claim.dateOriginalWording),
               }
             : undefined,
           citations: citations
@@ -721,7 +728,7 @@ async function loadExtractions(householdId: string) {
           dueDate: responsibility.dueDateOriginalWording
             ? {
                 originalWording: responsibility.dueDateOriginalWording,
-                resolvedDate: responsibility.dueDateResolved,
+                resolvedDate: resolve(responsibility.dueDateOriginalWording),
               }
             : undefined,
           amount:

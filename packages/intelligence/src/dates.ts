@@ -1,5 +1,31 @@
 import * as chrono from "chrono-node";
 
+/**
+ * Leading words a School Communication routinely puts in front of a deadline date, e.g.
+ * "by 17 July 2026" or "due on Friday". They qualify the date rather than adding a separate
+ * fact, so we let them precede the parsed date while still rejecting wording where the date is
+ * buried in an instruction sentence (e.g. "Please return this Monday"), which we cannot trust.
+ */
+const DEADLINE_QUALIFIER_PREFIXES = new Set([
+  "by",
+  "by the",
+  "on",
+  "before",
+  "after",
+  "due",
+  "due by",
+  "due on",
+  "no later than",
+  "by no later than",
+  "from",
+  "starting",
+  "starting on",
+  "starts",
+  "until",
+  "week commencing",
+  "w/c",
+]);
+
 export function resolveRelativeDate(
   originalWording: string,
   receivedAt: string,
@@ -15,7 +41,15 @@ export function resolveRelativeDate(
   );
   const result = results.length === 1 ? results[0] : undefined;
 
-  if (!result || result.index !== 0 || result.text.length !== wording.length) {
+  if (!result) {
+    return { originalWording, resolvedDate: null };
+  }
+
+  const prefix = wording.slice(0, result.index).trim().toLowerCase().replace(/\s+/gu, " ");
+  const reachesEnd = result.index + result.text.length === wording.length;
+  const hasAllowedPrefix = prefix.length === 0 || DEADLINE_QUALIFIER_PREFIXES.has(prefix);
+
+  if (!reachesEnd || !hasAllowedPrefix) {
     return { originalWording, resolvedDate: null };
   }
 
