@@ -23,8 +23,9 @@ import {
   RotateCcwIcon,
   Settings2Icon,
   ChevronDownIcon,
+  WifiOffIcon,
 } from "lucide-react";
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { digestEvidenceKey, isDigestItemDismissed } from "#/lib/digest-item-status";
@@ -36,6 +37,7 @@ import {
   $setHouseholdResponsibilityCompleted,
 } from "#/lib/household-digest.functions";
 import { $listHouseholdRoutines } from "#/lib/household-routine.functions";
+import { $getHouseholdSyncState } from "#/lib/household-sync.functions";
 import { $getHousehold } from "#/lib/household.functions";
 
 export const Route = createFileRoute("/_auth/app/digest")({
@@ -54,14 +56,48 @@ export const Route = createFileRoute("/_auth/app/digest")({
 function DigestPage() {
   const { household, digestData, routines } = Route.useLoaderData();
   const router = useRouter();
+  const [isSyncPolling, setIsSyncPolling] = useState(false);
+  const [needsReauth, setNeedsReauth] = useState(false);
+
+  // Poll sync state while a background sweep is covering the Household.
+  useEffect(() => {
+    if (!isSyncPolling) return;
+    let cancelled = false;
+    const poll = async () => {
+      const state = await $getHouseholdSyncState();
+      if (cancelled) return;
+      if (state?.needsReauth) {
+        setNeedsReauth(true);
+        setIsSyncPolling(false);
+        return;
+      }
+      if (state?.status !== "running") {
+        setIsSyncPolling(false);
+        await router.invalidate({ sync: true });
+        toast.success("Digest updated.");
+        return;
+      }
+      setTimeout(poll, 3_000);
+    };
+    void poll();
+    return () => {
+      cancelled = true;
+    };
+  }, [isSyncPolling, router]);
+
   const fetchMutation = useMutation({
     mutationFn: $fetchNewCommunications,
-    onSuccess: async ({ importedCount }) => {
+    onSuccess: async (result) => {
+      if (result.syncing) {
+        // Background sweep in progress — attach by polling.
+        setIsSyncPolling(true);
+        return;
+      }
       await router.invalidate({ sync: true });
       toast.success(
-        importedCount === 0
+        result.importedCount === 0
           ? "Digest is already up to date."
-          : `Added ${importedCount} new ${importedCount === 1 ? "communication" : "communications"}.`,
+          : `Added ${result.importedCount} new ${result.importedCount === 1 ? "communication" : "communications"}.`,
       );
     },
     onError: (error) => {
@@ -112,15 +148,15 @@ function DigestPage() {
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"
-            disabled={fetchMutation.isPending}
+            disabled={fetchMutation.isPending || isSyncPolling}
             onClick={() => fetchMutation.mutate(undefined)}
           >
-            {fetchMutation.isPending ? (
+            {fetchMutation.isPending || isSyncPolling ? (
               <LoaderCircleIcon className="animate-spin" />
             ) : (
               <RefreshCwIcon />
             )}
-            Fetch new communications
+            {isSyncPolling ? "Syncing…" : "Fetch new communications"}
           </Button>
           <Button variant="outline" render={<Link to="/app/routines" />} nativeButton={false}>
             <Repeat2Icon />
@@ -137,6 +173,24 @@ function DigestPage() {
           </Button>
         </div>
       </div>
+      {needsReauth ? (
+        <div
+          role="alert"
+          className="-mt-6 mb-8 flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive"
+        >
+          <WifiOffIcon className="mt-0.5 size-4 shrink-0" />
+          <div>
+            <p className="font-medium">Gmail connection needs reconnecting</p>
+            <p className="mt-1 text-destructive/80">
+              Your Gmail access has expired or been revoked. Reconnect from{" "}
+              <Link className="underline underline-offset-2" to="/app/sources">
+                Sources
+              </Link>{" "}
+              to resume automatic sync.
+            </p>
+          </div>
+        </div>
+      ) : null}
       {fetchMutation.error ? (
         <p role="alert" className="-mt-6 mb-8 text-sm text-destructive">
           {getErrorMessage(fetchMutation.error, "Communications could not be fetched.")}

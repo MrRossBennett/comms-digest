@@ -5,6 +5,7 @@ packages:
 allowBuilds:
   braintrust: true
   esbuild: true
+  protobufjs: false
 
 # https://pnpm.io/settings#minimumreleaseage
 # https://pnpm.io/supply-chain-security#delay-dependency-updates
@@ -46,6 +47,7 @@ catalog:
   chrono-node: 2.9.1
   clsx: 2.1.1
   date-fns: 4.4.0
+  inngest: 4.5.1
   drizzle-kit: 1.0.0-rc.3
   drizzle-orm: 1.0.0-rc.3
   eslint-plugin-react-hooks: 7.1.1

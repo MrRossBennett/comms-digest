@@ -4,3 +4,4 @@ export * from "./household.schema";
 export * from "./household-routine.schema";
 export * from "./intelligence.schema";
 export * from "./responsibility.schema";
+export * from "./sync.schema";
