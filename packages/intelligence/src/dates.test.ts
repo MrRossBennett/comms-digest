@@ -16,6 +16,11 @@ test.each([
   ["next Monday", "2026-06-15"],
   ["this Monday", "2026-06-15"],
   ["Monday", "2026-06-15"],
+  ["by 17 July 2026", "2026-07-17"],
+  ["before 15th June", "2026-06-15"],
+  ["due by Monday 15 June", "2026-06-15"],
+  ["on 15/06/2026", "2026-06-15"],
+  ["no later than 15th June", "2026-06-15"],
 ])('resolves UK school date wording "%s"', (wording, resolvedDate) => {
   expect(resolveRelativeDate(wording, receivedAt, timezone)).toEqual({
     originalWording: wording,
@@ -35,6 +40,8 @@ test.each([
   "Wednesday 18th June",
   "Monday and Tuesday",
   "Please return this Monday",
+  "the swimming trip on 15th June",
+  "15th June at the latest",
 ])('preserves unverifiable date wording "%s" without guessing', (wording) => {
   expect(resolveRelativeDate(wording, receivedAt, timezone)).toEqual({
     originalWording: wording,
