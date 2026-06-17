@@ -13,97 +13,48 @@ import { useMutation } from "@tanstack/react-query";
 import { createFileRoute, Link, redirect, useRouter } from "@tanstack/react-router";
 import {
   CheckIcon,
+  ChevronDownIcon,
+  EyeOffIcon,
   FileTextIcon,
   LoaderCircleIcon,
   MailIcon,
-  EyeOffIcon,
   PencilIcon,
-  RefreshCwIcon,
   Repeat2Icon,
   RotateCcwIcon,
   Settings2Icon,
-  ChevronDownIcon,
   WifiOffIcon,
 } from "lucide-react";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useState } from "react";
 import { toast } from "sonner";
 
 import { digestEvidenceKey, isDigestItemDismissed } from "#/lib/digest-item-status";
-import { getErrorMessage } from "#/lib/error-message";
 import {
-  $fetchNewCommunications,
   $getHouseholdDigest,
   $setHouseholdDigestItemDismissed,
   $setHouseholdResponsibilityCompleted,
 } from "#/lib/household-digest.functions";
 import { $listHouseholdRoutines } from "#/lib/household-routine.functions";
+import { needsReauthFromSyncState } from "#/lib/household-sync";
 import { $getHouseholdSyncState } from "#/lib/household-sync.functions";
 import { $getHousehold } from "#/lib/household.functions";
 
 export const Route = createFileRoute("/_auth/app/digest")({
   loader: async () => {
-    const [household, digestData, routines] = await Promise.all([
+    const [household, digestData, routines, syncState] = await Promise.all([
       $getHousehold(),
       $getHouseholdDigest(),
       $listHouseholdRoutines(),
+      $getHouseholdSyncState(),
     ]);
     if (!household) throw redirect({ to: "/app/onboarding" });
-    return { household, digestData, routines };
+    return { household, digestData, routines, needsReauth: needsReauthFromSyncState(syncState) };
   },
   component: DigestPage,
 });
 
 function DigestPage() {
-  const { household, digestData, routines } = Route.useLoaderData();
+  const { household, digestData, routines, needsReauth } = Route.useLoaderData();
   const router = useRouter();
-  const [isSyncPolling, setIsSyncPolling] = useState(false);
-  const [needsReauth, setNeedsReauth] = useState(false);
-
-  // Poll sync state while a background sweep is covering the Household.
-  useEffect(() => {
-    if (!isSyncPolling) return;
-    let cancelled = false;
-    const poll = async () => {
-      const state = await $getHouseholdSyncState();
-      if (cancelled) return;
-      if (state?.needsReauth) {
-        setNeedsReauth(true);
-        setIsSyncPolling(false);
-        return;
-      }
-      if (state?.status !== "running") {
-        setIsSyncPolling(false);
-        await router.invalidate({ sync: true });
-        toast.success("Digest updated.");
-        return;
-      }
-      setTimeout(poll, 3_000);
-    };
-    void poll();
-    return () => {
-      cancelled = true;
-    };
-  }, [isSyncPolling, router]);
-
-  const fetchMutation = useMutation({
-    mutationFn: $fetchNewCommunications,
-    onSuccess: async (result) => {
-      if (result.syncing) {
-        // Background sweep in progress — attach by polling.
-        setIsSyncPolling(true);
-        return;
-      }
-      await router.invalidate({ sync: true });
-      toast.success(
-        result.importedCount === 0
-          ? "Digest is already up to date."
-          : `Added ${result.importedCount} new ${result.importedCount === 1 ? "communication" : "communications"}.`,
-      );
-    },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, "Communications could not be fetched."));
-    },
-  });
   const statusMutation = useMutation({
     mutationFn: (data: { responsibilityId: string; completed: boolean }) =>
       $setHouseholdResponsibilityCompleted({ data }),
@@ -146,18 +97,6 @@ function DigestPage() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            disabled={fetchMutation.isPending || isSyncPolling}
-            onClick={() => fetchMutation.mutate(undefined)}
-          >
-            {fetchMutation.isPending || isSyncPolling ? (
-              <LoaderCircleIcon className="animate-spin" />
-            ) : (
-              <RefreshCwIcon />
-            )}
-            {isSyncPolling ? "Syncing…" : "Fetch new communications"}
-          </Button>
           <Button variant="outline" render={<Link to="/app/routines" />} nativeButton={false}>
             <Repeat2Icon />
             Routines
@@ -191,12 +130,6 @@ function DigestPage() {
           </div>
         </div>
       ) : null}
-      {fetchMutation.error ? (
-        <p role="alert" className="-mt-6 mb-8 text-sm text-destructive">
-          {getErrorMessage(fetchMutation.error, "Communications could not be fetched.")}
-        </p>
-      ) : null}
-
       {digestData?.digest || routines.length > 0 ? (
         <HouseholdDigest
           digest={digestData?.digest ?? { actNow: [], comingUp: [], goodToKnow: [] }}
