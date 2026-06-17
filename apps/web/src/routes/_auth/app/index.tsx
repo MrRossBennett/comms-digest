@@ -349,19 +349,33 @@ function DayPlanEntryCard({
           {claims.length > 0 ? (
             <SourcesButton communications={communications} claims={claims} />
           ) : null}
-          {entryActions(entry, pending, onStatusChange, onDismissedChange).map((action) => (
-            <TooltipButton
-              key={action.label}
-              type="button"
-              variant={action.variant}
-              size="icon-sm"
-              tooltip={action.label}
-              disabled={action.pending}
-              onClick={action.onClick}
-            >
-              {action.pending ? <LoaderCircleIcon className="animate-spin" /> : action.icon}
-            </TooltipButton>
-          ))}
+          {entryActions(entry, pending, onStatusChange, onDismissedChange).map((action) => {
+            const completing = action.isCompleteAction && action.pending;
+            return (
+              <TooltipButton
+                key={action.label}
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                tooltip={action.label}
+                disabled={action.pending}
+                onClick={action.onClick}
+                className={
+                  completing
+                    ? "border-emerald-500 bg-emerald-500 text-white hover:bg-emerald-500 hover:text-white"
+                    : undefined
+                }
+              >
+                {completing ? (
+                  <CheckIcon />
+                ) : action.pending ? (
+                  <LoaderCircleIcon className="animate-spin" />
+                ) : (
+                  action.icon
+                )}
+              </TooltipButton>
+            );
+          })}
         </div>
       </div>
     </article>
@@ -371,9 +385,9 @@ function DayPlanEntryCard({
 type EntryAction = {
   label: string;
   icon: React.ReactNode;
-  variant: "default" | "outline";
   onClick: () => void;
   pending: boolean;
+  isCompleteAction?: boolean;
 };
 
 function entryActions(
@@ -387,7 +401,6 @@ function entryActions(
   const dismissAction: EntryAction = {
     label: "Dismiss",
     icon: <EyeOffIcon />,
-    variant: "outline",
     onClick: () => onDismissedChange(entry, true),
     pending,
   };
@@ -399,9 +412,9 @@ function entryActions(
     {
       label: "Mark completed",
       icon: <CheckIcon />,
-      variant: "default",
       onClick: () => onStatusChange(entry.responsibilityId!, true),
       pending,
+      isCompleteAction: true,
     },
   ];
 }
@@ -457,10 +470,9 @@ function SourcesButton({
     <Dialog open={open} onOpenChange={setOpen}>
       <TooltipButton
         type="button"
-        variant="ghost"
+        variant="outline"
         size="icon-sm"
         tooltip="Sources"
-        className="text-muted-foreground"
         onClick={() => setOpen(true)}
       >
         <FileTextIcon />
