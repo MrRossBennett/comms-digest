@@ -9,6 +9,7 @@ import {
 import { Badge } from "@repo/ui/components/badge";
 import { Button } from "@repo/ui/components/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@repo/ui/components/dialog";
+import { TooltipButton } from "@repo/ui/components/tooltip-button";
 import { useMutation } from "@tanstack/react-query";
 import { createFileRoute, Link, redirect, useRouter } from "@tanstack/react-router";
 import {
@@ -480,16 +481,17 @@ function DigestItem({
         <div className="flex flex-wrap items-start gap-2">
           <SourcesButton communications={communications} claims={item.claims} />
           {actions.map((action) => (
-            <Button
+            <TooltipButton
               key={action.label}
               type="button"
               variant={action.variant}
+              size="icon-sm"
+              tooltip={action.label}
               disabled={action.pending}
               onClick={action.onClick}
             >
               {action.pending ? <LoaderCircleIcon className="animate-spin" /> : action.icon}
-              {action.label}
-            </Button>
+            </TooltipButton>
           ))}
         </div>
       </div>
@@ -612,16 +614,16 @@ function SourcesButton({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <Button
+      <TooltipButton
         type="button"
         variant="ghost"
-        size="sm"
+        size="icon-sm"
+        tooltip="Sources"
         className="text-muted-foreground"
         onClick={() => setOpen(true)}
       >
-        <FileTextIcon className="size-3.5" />
-        Sources
-      </Button>
+        <FileTextIcon />
+      </TooltipButton>
       <DialogContent className="max-h-[85vh] w-full overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Source communications</DialogTitle>
