@@ -97,6 +97,10 @@ _Avoid_: Source link, footnote, evidence score
 The immutable **School Communications** and their extracted **Claims**, **Citations**, and **Responsibilities** retained for a **Household**. A **Digest**, **Day Plan**, and **Grounded Chat** are derived from this evidence rather than treated as evidence themselves.
 _Avoid_: Digest rows, extraction output, generated summary
 
+**Evidence Status**:
+A **Household Owner**'s completed or dismissed state for a **Claim** or **Responsibility** in their **Stored Evidence**. It belongs to the underlying evidence rather than a generated **Digest** item, so it survives projection rebuilds.
+_Avoid_: Digest item status, generated-row status
+
 **Grounded Chat**:
 A conversation in which Comms Digest answers from stored **Claims**, **Responsibilities**, **Citations**, and relevant **School Communications**. It refuses questions that cannot be supported and requires confirmation before causing any external change.
 _Avoid_: Chatbot, general assistant, Q&A
