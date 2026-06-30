@@ -28,10 +28,12 @@ import {
   type IngestionCandidate,
 } from "./communication-fetcher";
 import { createGmailFetcher, listConfirmedSources } from "./communication-fetcher.server";
-import { listDismissedDigestEvidenceIds } from "./digest-item-status.server";
 import { getErrorMessage } from "./error-message";
+import {
+  listCompletedResponsibilityIds,
+  listDismissedDigestEvidenceIds,
+} from "./evidence-status.server";
 import { getHouseholdForOwner } from "./household.server";
-import { listCompletedResponsibilityIds } from "./responsibility-status.server";
 import { fromStoredEvidenceRows, toStoredEvidenceRows } from "./stored-evidence";
 
 type HouseholdSetup = NonNullable<Awaited<ReturnType<typeof getHouseholdForOwner>>>;
