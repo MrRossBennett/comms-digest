@@ -16,13 +16,11 @@ import {
   composeDigest,
   createExtractionWorkflow,
   reconcileDigest,
-  resolveRelativeDate,
   schoolCommunicationSchema,
-  validatedExtractionSchema,
+  type ValidatedExtraction,
 } from "@repo/intelligence";
 import { createLiveExtractor } from "@repo/intelligence/live";
 import { and, asc, eq, inArray } from "drizzle-orm";
-import { z } from "zod";
 
 import {
   type CommunicationFetcher,
@@ -34,6 +32,7 @@ import { listDismissedDigestEvidenceIds } from "./digest-item-status.server";
 import { getErrorMessage } from "./error-message";
 import { getHouseholdForOwner } from "./household.server";
 import { listCompletedResponsibilityIds } from "./responsibility-status.server";
+import { fromStoredEvidenceRows, toStoredEvidenceRows } from "./stored-evidence";
 
 type HouseholdSetup = NonNullable<Awaited<ReturnType<typeof getHouseholdForOwner>>>;
 
@@ -237,23 +236,20 @@ async function ingestCandidate(
 async function persistExtraction(
   householdId: string,
   candidate: IngestionCandidate,
-  extraction: z.infer<typeof validatedExtractionSchema>,
+  extraction: ValidatedExtraction,
 ) {
+  const rows = toStoredEvidenceRows(extraction, {
+    householdId,
+    communicationSourceId: candidate.source.id,
+    sourceAudience: candidate.source.audience,
+    externalMessageId: candidate.externalMessageId,
+    senderAddress: candidate.senderAddress,
+  });
+
   await db.transaction(async (transaction) => {
     const inserted = await transaction
       .insert(schoolCommunication)
-      .values({
-        id: extraction.communication.id,
-        householdId,
-        communicationSourceId: candidate.source.id,
-        schoolId: extraction.communication.schoolId,
-        sourceAudience: candidate.source.audience,
-        externalMessageId: candidate.externalMessageId,
-        senderAddress: candidate.senderAddress,
-        receivedAt: new Date(extraction.communication.receivedAt),
-        subject: extraction.communication.subject,
-        sourceText: extraction.communication.sourceText,
-      })
+      .values(rows.communication)
       .onConflictDoNothing({
         target: [schoolCommunication.householdId, schoolCommunication.externalMessageId],
       })
@@ -261,62 +257,18 @@ async function persistExtraction(
 
     if (inserted.length === 0) return;
 
-    if (extraction.communication.sourceChildIds?.length) {
-      await transaction.insert(schoolCommunicationChild).values(
-        extraction.communication.sourceChildIds.map((childId) => ({
-          communicationId: extraction.communication.id,
-          childId,
-        })),
-      );
+    if (rows.communicationChildren.length > 0) {
+      await transaction.insert(schoolCommunicationChild).values(rows.communicationChildren);
     }
 
-    if (extraction.claims.length > 0) {
-      await transaction.insert(claimTable).values(
-        extraction.claims.map((claim) => ({
-          id: claim.id,
-          communicationId: extraction.communication.id,
-          content: claim.content,
-          audienceScope: claim.audience.scope,
-          audienceOriginalWording: claim.audience.originalWording,
-          certainty: claim.certainty,
-          dateOriginalWording: claim.date?.originalWording,
-          dateResolved: claim.date?.resolvedDate,
-        })),
-      );
-      await transaction.insert(citationTable).values(
-        extraction.claims.flatMap((claim) =>
-          claim.citations.map((citation) => ({
-            id: citation.id,
-            claimId: claim.id,
-            communicationId: extraction.communication.id,
-            quote: citation.quote,
-            start: citation.start,
-            end: citation.end,
-          })),
-        ),
-      );
+    if (rows.claims.length > 0) {
+      await transaction.insert(claimTable).values(rows.claims);
+      await transaction.insert(citationTable).values(rows.citations);
     }
 
-    if (extraction.responsibilities.length > 0) {
-      await transaction.insert(responsibilityTable).values(
-        extraction.responsibilities.map((responsibility) => ({
-          id: responsibility.id,
-          householdId,
-          title: responsibility.title,
-          dueDateOriginalWording: responsibility.dueDate?.originalWording,
-          dueDateResolved: responsibility.dueDate?.resolvedDate,
-          amountCurrency: responsibility.amount?.currency,
-          amountMinorUnits: responsibility.amount?.minorUnits,
-        })),
-      );
-      await transaction.insert(responsibilityClaim).values(
-        extraction.responsibilities.flatMap((responsibility) =>
-          responsibility.supportingClaimIds.map((claimId) => ({
-            responsibilityId: responsibility.id,
-            claimId,
-          })),
-        ),
-      );
+    if (rows.responsibilities.length > 0) {
+      await transaction.insert(responsibilityTable).values(rows.responsibilities);
+      await transaction.insert(responsibilityClaim).values(rows.responsibilityClaims);
     }
   });
 }
@@ -361,89 +313,16 @@ async function loadExtractions(householdId: string) {
           .from(responsibilityTable)
           .where(inArray(responsibilityTable.id, responsibilityIds));
 
-  return communications.map((communicationRow) => {
-    const scopedChildIds = sourceChildren
-      .filter(({ communicationId }) => communicationId === communicationRow.id)
-      .map(({ childId }) => childId);
-
-    // Re-resolve stored date wording on every load rather than trusting the date that was
-    // resolved at ingestion. This keeps resolution as the single source of truth, so resolver
-    // improvements reach already-stored School Communications without re-running extraction.
-    const receivedAt = communicationRow.receivedAt.toISOString();
-    const householdTimezone = "Europe/London";
-    const resolve = (originalWording: string) =>
-      resolveRelativeDate(originalWording, receivedAt, householdTimezone).resolvedDate;
-
-    return validatedExtractionSchema.parse({
-      communication: {
-        id: communicationRow.id,
-        kind: "email",
-        schoolId: communicationRow.schoolId,
-        sourceChildIds: communicationRow.sourceAudience === "children" ? scopedChildIds : undefined,
-        receivedAt,
-        householdTimezone,
-        subject: communicationRow.subject ?? undefined,
-        sourceText: communicationRow.sourceText,
-      },
-      claims: claims
-        .filter(({ communicationId }) => communicationId === communicationRow.id)
-        .map((claim) => ({
-          id: claim.id,
-          content: claim.content,
-          audience: {
-            scope: claim.audienceScope,
-            originalWording: claim.audienceOriginalWording,
-          },
-          certainty: claim.certainty,
-          date: claim.dateOriginalWording
-            ? {
-                originalWording: claim.dateOriginalWording,
-                resolvedDate: resolve(claim.dateOriginalWording),
-              }
-            : undefined,
-          citations: citations
-            .filter(({ claimId }) => claimId === claim.id)
-            .map((citation) => ({
-              id: citation.id,
-              communicationId: citation.communicationId,
-              quote: citation.quote,
-              start: citation.start,
-              end: citation.end,
-            })),
-        })),
-      responsibilities: responsibilities
-        .filter((responsibility) =>
-          responsibilityLinks.some(
-            (link) =>
-              link.responsibilityId === responsibility.id &&
-              claims.some(
-                (claim) =>
-                  claim.communicationId === communicationRow.id && claim.id === link.claimId,
-              ),
-          ),
-        )
-        .map((responsibility) => ({
-          id: responsibility.id,
-          title: responsibility.title,
-          dueDate: responsibility.dueDateOriginalWording
-            ? {
-                originalWording: responsibility.dueDateOriginalWording,
-                resolvedDate: resolve(responsibility.dueDateOriginalWording),
-              }
-            : undefined,
-          amount:
-            responsibility.amountCurrency && responsibility.amountMinorUnits !== null
-              ? {
-                  currency: responsibility.amountCurrency,
-                  minorUnits: responsibility.amountMinorUnits,
-                }
-              : undefined,
-          supportingClaimIds: responsibilityLinks
-            .filter(({ responsibilityId }) => responsibilityId === responsibility.id)
-            .map(({ claimId }) => claimId),
-        })),
-    });
-  });
+  return communications.map((communication) =>
+    fromStoredEvidenceRows({
+      communication,
+      communicationChildren: sourceChildren,
+      claims,
+      citations,
+      responsibilities,
+      responsibilityClaims: responsibilityLinks,
+    }),
+  );
 }
 
 export async function rebuildHouseholdDigest(

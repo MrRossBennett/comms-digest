@@ -93,6 +93,10 @@ _Avoid_: Fact, extraction, confidence score
 The exact supporting passage from an immutable snapshot of a **School Communication** that grounds a **Claim**. Every **Claim** has at least one **Citation**, although the **Household Owner** may choose whether citations are visible in the **Digest**.
 _Avoid_: Source link, footnote, evidence score
 
+**Stored Evidence**:
+The immutable **School Communications** and their extracted **Claims**, **Citations**, and **Responsibilities** retained for a **Household**. A **Digest**, **Day Plan**, and **Grounded Chat** are derived from this evidence rather than treated as evidence themselves.
+_Avoid_: Digest rows, extraction output, generated summary
+
 **Grounded Chat**:
 A conversation in which Comms Digest answers from stored **Claims**, **Responsibilities**, **Citations**, and relevant **School Communications**. It refuses questions that cannot be supported and requires confirmation before causing any external change.
 _Avoid_: Chatbot, general assistant, Q&A
