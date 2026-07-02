@@ -194,8 +194,9 @@ async function fetchGmailCandidates(
       ),
     );
     const subject =
-      message.payload.headers?.find(({ name }) => name.toLocaleLowerCase("en-GB") === "subject")
-        ?.value ?? "School communication";
+      message.payload.headers
+        ?.find(({ name }) => name.toLocaleLowerCase("en-GB") === "subject")
+        ?.value.trim() || "School communication";
     const fromHeader = message.payload.headers?.find(
       ({ name }) => name.toLocaleLowerCase("en-GB") === "from",
     )?.value;
