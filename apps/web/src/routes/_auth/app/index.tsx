@@ -68,17 +68,16 @@ function TodaysToDos() {
   });
 
   const { household } = dayPlanData;
+  const [childFilter, setChildFilter] = useState<string | null>(null);
 
   return (
     <main className="mx-auto w-full max-w-5xl px-5 py-10 sm:px-8 sm:py-14">
       <div className="mb-10 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-2">
           <p className="text-sm font-medium text-muted-foreground">
-            {dayPlanData.hasEvidence
-              ? `Day Plan · ${formatDate(dayPlanData.dayPlan.date)}`
-              : "Your Household"}
+            {dayPlanData.hasEvidence ? formatDate(dayPlanData.dayPlan.date) : "Your Household"}
           </p>
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Today's to-dos</h1>
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">To-do</h1>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
             {household.children.map((householdChild) => (
               <span key={householdChild.id}>
@@ -104,12 +103,21 @@ function TodaysToDos() {
         </div>
       </div>
 
+      {household.children.length > 1 ? (
+        <ChildFilter
+          householdChildren={household.children}
+          selectedChildId={childFilter}
+          onSelect={setChildFilter}
+        />
+      ) : null}
+
       {dayPlanData.hasEvidence ? (
         <DayPlanGroups
           dayPlan={dayPlanData.dayPlan}
           routines={dayPlanData.routines}
           communications={dayPlanData.communications}
           householdChildren={household.children}
+          selectedChildId={childFilter}
           claimsById={claimsById(dayPlanData.digest)}
           pendingResponsibilityId={
             statusMutation.isPending ? statusMutation.variables?.responsibilityId : undefined
@@ -146,7 +154,7 @@ function EmptyDayPlan() {
             <MailIcon className="size-4" />
           </div>
           <div>
-            <h2 className="font-semibold tracking-tight">Today's to-dos isn't ready yet</h2>
+            <h2 className="font-semibold tracking-tight">Your to-do list isn't ready yet</h2>
             <p className="mt-1 max-w-xl text-sm leading-6 text-muted-foreground">
               Confirm Communication Sources, then fetch new communications from the Digest to
               produce your first Day Plan.
@@ -168,11 +176,49 @@ function EmptyDayPlan() {
   );
 }
 
+function ChildFilter({
+  householdChildren,
+  selectedChildId,
+  onSelect,
+}: {
+  householdChildren: Array<{ id: string; displayName: string }>;
+  selectedChildId: string | null;
+  onSelect: (childId: string | null) => void;
+}) {
+  const chipClass = (active: boolean) =>
+    active
+      ? "rounded-full border border-primary bg-primary px-3 py-1 text-sm font-medium text-primary-foreground"
+      : "rounded-full border bg-background px-3 py-1 text-sm text-muted-foreground hover:bg-muted";
+
+  return (
+    <fieldset className="mb-8 flex flex-wrap gap-2" aria-label="Filter by student">
+      <button
+        type="button"
+        className={chipClass(selectedChildId === null)}
+        onClick={() => onSelect(null)}
+      >
+        Everyone
+      </button>
+      {householdChildren.map((householdChild) => (
+        <button
+          key={householdChild.id}
+          type="button"
+          className={chipClass(selectedChildId === householdChild.id)}
+          onClick={() => onSelect(householdChild.id)}
+        >
+          {householdChild.displayName}
+        </button>
+      ))}
+    </fieldset>
+  );
+}
+
 function DayPlanGroups({
   dayPlan,
   routines,
   communications,
   householdChildren,
+  selectedChildId,
   claimsById,
   pendingResponsibilityId,
   pendingDismissedItemKey,
@@ -183,6 +229,7 @@ function DayPlanGroups({
   routines: HouseholdRoutine[];
   communications: SchoolCommunication[];
   householdChildren: Array<{ id: string; displayName: string }>;
+  selectedChildId: string | null;
   claimsById: Map<string, ValidatedExtraction["claims"][number]>;
   pendingResponsibilityId?: string;
   pendingDismissedItemKey?: string;
@@ -201,34 +248,58 @@ function DayPlanGroups({
     onDismissedChange,
   };
 
+  // A household-wide entry (no specific students) always applies; otherwise it
+  // must include the filtered student.
+  const matchesChild = (entry: DayPlanEntry) =>
+    selectedChildId === null ||
+    entry.childIds.length === 0 ||
+    entry.childIds.includes(selectedChildId);
+  // Responsibilities and routines are things you complete; claims are events and
+  // information you only need to be aware of. They read as two different jobs.
+  const todosOf = (entries: DayPlanEntry[]) =>
+    entries.filter((entry) => entry.source !== "claim" && matchesChild(entry));
+  const fyiOf = (entries: DayPlanEntry[]) =>
+    entries.filter((entry) => entry.source === "claim" && matchesChild(entry));
+
+  const goodToKnow = [...fyiOf(dayPlan.today), ...fyiOf(dayPlan.comingUp)];
+
   return (
     <div className="grid gap-8">
       <DayPlanSection
         id="overdue"
         title="Overdue"
+        tone="danger"
         description="Carried forward from earlier — these still need action."
-        entries={dayPlan.overdue}
+        entries={todosOf(dayPlan.overdue)}
         {...sharedProps}
       />
       <DayPlanSection
         id="today"
         title="Today"
-        entries={dayPlan.today}
-        emptyMessage="Nothing to do today."
+        entries={todosOf(dayPlan.today)}
+        emptyMessage="Nothing due today."
         {...sharedProps}
       />
       <DayPlanSection
-        id="no-date"
-        title="No date — still open"
-        entries={dayPlan.noDate}
+        id="this-week"
+        title="This week"
+        description="Due over the next seven days."
+        entries={todosOf(dayPlan.comingUp)}
         {...sharedProps}
       />
       <DayPlanSection
-        id="coming-up"
-        title="Coming up"
-        description="Over the next week."
-        entries={dayPlan.comingUp}
-        emptyMessage="Nothing coming up in the next week."
+        id="anytime"
+        title="Anytime"
+        description="No date yet — do these when you can."
+        entries={todosOf(dayPlan.noDate)}
+        {...sharedProps}
+      />
+      <DayPlanSection
+        id="good-to-know"
+        title="Good to know"
+        tone="muted"
+        description="Events and updates from school — nothing to action."
+        entries={goodToKnow}
         {...sharedProps}
       />
     </div>
@@ -239,6 +310,7 @@ function DayPlanSection({
   id,
   title,
   description,
+  tone,
   entries,
   emptyMessage,
   communications,
@@ -253,6 +325,7 @@ function DayPlanSection({
   id: string;
   title: string;
   description?: string;
+  tone?: "danger" | "muted";
   entries: DayPlanEntry[];
   emptyMessage?: string;
   communications: SchoolCommunication[];
@@ -267,10 +340,21 @@ function DayPlanSection({
   if (entries.length === 0 && !emptyMessage) return null;
 
   return (
-    <section aria-labelledby={`${id}-heading`}>
+    <section
+      aria-labelledby={`${id}-heading`}
+      className={tone === "muted" ? "border-t pt-8" : undefined}
+    >
       <div className="mb-3">
-        <h2 id={`${id}-heading`} className="font-semibold tracking-tight">
+        <h2
+          id={`${id}-heading`}
+          className={
+            tone === "danger"
+              ? "font-semibold tracking-tight text-destructive"
+              : "font-semibold tracking-tight"
+          }
+        >
           {title}
+          {tone === "danger" ? ` · ${entries.length}` : ""}
         </h2>
         {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
       </div>

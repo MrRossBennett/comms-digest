@@ -51,7 +51,7 @@ function AppLayout() {
             <nav className="hidden items-center gap-1 sm:flex" aria-label="Main navigation">
               <Button variant="ghost" size="sm" render={<Link to="/app" />} nativeButton={false}>
                 <HomeIcon />
-                Today's to-dos
+                To-do
               </Button>
               <Button
                 variant="ghost"
@@ -187,7 +187,7 @@ function MobileNavigation() {
       <DropdownMenuContent align="end" className="w-48 sm:hidden">
         <DropdownMenuItem render={<Link to="/app" />}>
           <HomeIcon />
-          Today's to-dos
+          To-do
         </DropdownMenuItem>
         <DropdownMenuItem render={<Link to="/app/chat" />}>
           <MessageCircleIcon />
