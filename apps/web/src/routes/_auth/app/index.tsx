@@ -23,10 +23,12 @@ import {
   MailIcon,
   PencilIcon,
   Repeat2Icon,
+  SmartphoneIcon,
   Settings2Icon,
 } from "lucide-react";
 import { Fragment, useState } from "react";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { digestEvidenceKey } from "#/lib/digest-item-status";
 import { $getDayPlan } from "#/lib/household-day-plan.functions";
@@ -36,8 +38,10 @@ import {
 } from "#/lib/household-digest.functions";
 
 export const Route = createFileRoute("/_auth/app/")({
-  loader: async () => {
-    const dayPlanData = await $getDayPlan();
+  validateSearch: z.object({ date: z.iso.date().optional() }),
+  loaderDeps: ({ search }) => ({ date: search.date }),
+  loader: async ({ deps }) => {
+    const dayPlanData = await $getDayPlan({ data: { date: deps.date } });
     if (!dayPlanData) throw redirect({ to: "/app/onboarding" });
     return { dayPlanData };
   },
@@ -78,7 +82,9 @@ function TodaysToDos() {
           <p className="text-sm font-medium text-muted-foreground">
             {dayPlanData.hasEvidence ? formatDate(dayPlanData.dayPlan.date) : "Your Household"}
           </p>
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">To-do</h1>
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+            {dayPlanHeading(dayPlanData.dayPlan.date, dayPlanData.today)}
+          </h1>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
             {household.children.map((householdChild) => (
               <span key={householdChild.id}>
@@ -88,6 +94,10 @@ function TodaysToDos() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button variant="outline" render={<Link to="/app/delivery" />} nativeButton={false}>
+            <SmartphoneIcon />
+            Delivery
+          </Button>
           <Button variant="outline" render={<Link to="/app/routines" />} nativeButton={false}>
             <Repeat2Icon />
             Routines
@@ -144,6 +154,14 @@ function TodaysToDos() {
       )}
     </main>
   );
+}
+
+function dayPlanHeading(planDate: string, today: string) {
+  if (planDate === today) return "Today's to-dos";
+  const tomorrow = new Date(`${today}T00:00:00Z`);
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  if (planDate === tomorrow.toISOString().slice(0, 10)) return "For tomorrow…";
+  return "Day Plan";
 }
 
 function EmptyDayPlan() {
