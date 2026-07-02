@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as GuestRouteRouteImport } from './routes/_guest/route'
 import { Route as AuthRouteRouteImport } from './routes/_auth/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiTwilioRouteImport } from './routes/api/twilio'
 import { Route as ApiInngestRouteImport } from './routes/api/inngest'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as GuestSignupRouteImport } from './routes/_guest/signup'
@@ -24,6 +25,7 @@ import { Route as AuthAppRoutinesRouteImport } from './routes/_auth/app/routines
 import { Route as AuthAppOnboardingRouteImport } from './routes/_auth/app/onboarding'
 import { Route as AuthAppDigestRouteImport } from './routes/_auth/app/digest'
 import { Route as AuthAppDemoRouteImport } from './routes/_auth/app/demo'
+import { Route as AuthAppDeliveryRouteImport } from './routes/_auth/app/delivery'
 import { Route as AuthAppChatRouteImport } from './routes/_auth/app/chat'
 
 const GuestRouteRoute = GuestRouteRouteImport.update({
@@ -37,6 +39,11 @@ const AuthRouteRoute = AuthRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTwilioRoute = ApiTwilioRouteImport.update({
+  id: '/api/twilio',
+  path: '/api/twilio',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiInngestRoute = ApiInngestRouteImport.update({
@@ -99,6 +106,11 @@ const AuthAppDemoRoute = AuthAppDemoRouteImport.update({
   path: '/demo',
   getParentRoute: () => AuthAppRouteRoute,
 } as any)
+const AuthAppDeliveryRoute = AuthAppDeliveryRouteImport.update({
+  id: '/delivery',
+  path: '/delivery',
+  getParentRoute: () => AuthAppRouteRoute,
+} as any)
 const AuthAppChatRoute = AuthAppChatRouteImport.update({
   id: '/chat',
   path: '/chat',
@@ -112,7 +124,9 @@ export interface FileRoutesByFullPath {
   '/signup': typeof GuestSignupRoute
   '/api/chat': typeof ApiChatRoute
   '/api/inngest': typeof ApiInngestRoute
+  '/api/twilio': typeof ApiTwilioRoute
   '/app/chat': typeof AuthAppChatRoute
+  '/app/delivery': typeof AuthAppDeliveryRoute
   '/app/demo': typeof AuthAppDemoRoute
   '/app/digest': typeof AuthAppDigestRoute
   '/app/onboarding': typeof AuthAppOnboardingRoute
@@ -127,7 +141,9 @@ export interface FileRoutesByTo {
   '/signup': typeof GuestSignupRoute
   '/api/chat': typeof ApiChatRoute
   '/api/inngest': typeof ApiInngestRoute
+  '/api/twilio': typeof ApiTwilioRoute
   '/app/chat': typeof AuthAppChatRoute
+  '/app/delivery': typeof AuthAppDeliveryRoute
   '/app/demo': typeof AuthAppDemoRoute
   '/app/digest': typeof AuthAppDigestRoute
   '/app/onboarding': typeof AuthAppOnboardingRoute
@@ -146,7 +162,9 @@ export interface FileRoutesById {
   '/_guest/signup': typeof GuestSignupRoute
   '/api/chat': typeof ApiChatRoute
   '/api/inngest': typeof ApiInngestRoute
+  '/api/twilio': typeof ApiTwilioRoute
   '/_auth/app/chat': typeof AuthAppChatRoute
+  '/_auth/app/delivery': typeof AuthAppDeliveryRoute
   '/_auth/app/demo': typeof AuthAppDemoRoute
   '/_auth/app/digest': typeof AuthAppDigestRoute
   '/_auth/app/onboarding': typeof AuthAppOnboardingRoute
@@ -164,7 +182,9 @@ export interface FileRouteTypes {
     | '/signup'
     | '/api/chat'
     | '/api/inngest'
+    | '/api/twilio'
     | '/app/chat'
+    | '/app/delivery'
     | '/app/demo'
     | '/app/digest'
     | '/app/onboarding'
@@ -179,7 +199,9 @@ export interface FileRouteTypes {
     | '/signup'
     | '/api/chat'
     | '/api/inngest'
+    | '/api/twilio'
     | '/app/chat'
+    | '/app/delivery'
     | '/app/demo'
     | '/app/digest'
     | '/app/onboarding'
@@ -197,7 +219,9 @@ export interface FileRouteTypes {
     | '/_guest/signup'
     | '/api/chat'
     | '/api/inngest'
+    | '/api/twilio'
     | '/_auth/app/chat'
+    | '/_auth/app/delivery'
     | '/_auth/app/demo'
     | '/_auth/app/digest'
     | '/_auth/app/onboarding'
@@ -213,6 +237,7 @@ export interface RootRouteChildren {
   GuestRouteRoute: typeof GuestRouteRouteWithChildren
   ApiChatRoute: typeof ApiChatRoute
   ApiInngestRoute: typeof ApiInngestRoute
+  ApiTwilioRoute: typeof ApiTwilioRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
@@ -237,6 +262,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/twilio': {
+      id: '/api/twilio'
+      path: '/api/twilio'
+      fullPath: '/api/twilio'
+      preLoaderRoute: typeof ApiTwilioRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/inngest': {
@@ -323,6 +355,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthAppDemoRouteImport
       parentRoute: typeof AuthAppRouteRoute
     }
+    '/_auth/app/delivery': {
+      id: '/_auth/app/delivery'
+      path: '/delivery'
+      fullPath: '/app/delivery'
+      preLoaderRoute: typeof AuthAppDeliveryRouteImport
+      parentRoute: typeof AuthAppRouteRoute
+    }
     '/_auth/app/chat': {
       id: '/_auth/app/chat'
       path: '/chat'
@@ -335,6 +374,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthAppRouteRouteChildren {
   AuthAppChatRoute: typeof AuthAppChatRoute
+  AuthAppDeliveryRoute: typeof AuthAppDeliveryRoute
   AuthAppDemoRoute: typeof AuthAppDemoRoute
   AuthAppDigestRoute: typeof AuthAppDigestRoute
   AuthAppOnboardingRoute: typeof AuthAppOnboardingRoute
@@ -345,6 +385,7 @@ interface AuthAppRouteRouteChildren {
 
 const AuthAppRouteRouteChildren: AuthAppRouteRouteChildren = {
   AuthAppChatRoute: AuthAppChatRoute,
+  AuthAppDeliveryRoute: AuthAppDeliveryRoute,
   AuthAppDemoRoute: AuthAppDemoRoute,
   AuthAppDigestRoute: AuthAppDigestRoute,
   AuthAppOnboardingRoute: AuthAppOnboardingRoute,
@@ -389,6 +430,7 @@ const rootRouteChildren: RootRouteChildren = {
   GuestRouteRoute: GuestRouteRouteWithChildren,
   ApiChatRoute: ApiChatRoute,
   ApiInngestRoute: ApiInngestRoute,
+  ApiTwilioRoute: ApiTwilioRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport

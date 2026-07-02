@@ -6,13 +6,14 @@ import { listHouseholdRoutinesForOwner } from "./household-routine.server";
 
 const HOUSEHOLD_TIMEZONE = "Europe/London";
 
-export async function getDayPlanForOwner(ownerUserId: string) {
+export async function getDayPlanForOwner(ownerUserId: string, requestedDate?: string) {
   const digestData = await getHouseholdDigestForOwner(ownerUserId);
   if (!digestData) return null;
 
   const routines = await listHouseholdRoutinesForOwner(ownerUserId);
   const digest = digestData.digest ?? { actNow: [], comingUp: [], goodToKnow: [] };
-  const referenceDate = todayInTimezone(HOUSEHOLD_TIMEZONE, new Date());
+  const today = todayInTimezone(HOUSEHOLD_TIMEZONE, new Date());
+  const referenceDate = requestedDate ?? today;
 
   const dayPlan = composeDayPlan({
     digest,
@@ -38,5 +39,6 @@ export async function getDayPlanForOwner(ownerUserId: string) {
     routines,
     communications: digestData.communications,
     hasEvidence: digestData.generatedAt !== null || routines.length > 0,
+    today,
   };
 }

@@ -1,11 +1,18 @@
 import { db } from "@repo/db";
 import { household, syncRun } from "@repo/db/schema";
+import { eq } from "drizzle-orm";
 
+import { deliverDayPlanForOwner, deliverTomorrowForOwner } from "#/lib/day-plan-delivery.server";
 import { fetchAndIngestForHousehold } from "#/lib/household-digest.server";
 import { markHouseholdSyncIdle, tryMarkHouseholdSyncRunning } from "#/lib/household-sync.server";
 import { isRootCauseReauth } from "#/lib/sync-error";
 
-import { householdBackfillEvent, householdSyncEvent, inngest } from "./client";
+import {
+  dayPlanDeliveryRetryEvent,
+  householdBackfillEvent,
+  householdSyncEvent,
+  inngest,
+} from "./client";
 
 // Deliberately high anomaly threshold — a smoke alarm, not a budget cap.
 // See: docs/adr/0011 Deliberately Deferred — enforced spend cap.
@@ -23,23 +30,25 @@ export const syncHouseholdFn = inngest.createFunction(
     retries: 2,
   },
   async ({ event, step }) => {
-    const { householdId, ownerUserId } = event.data;
+    const { householdId, ownerUserId, deliverTomorrow } = event.data;
 
     const acquired = await step.run("acquire-slot", () => tryMarkHouseholdSyncRunning(householdId));
 
     // Manual refresh got here first — cron loses this round (within freshness budget).
-    if (!acquired) return { outcome: "skipped_locked" as const };
+    if (!acquired) {
+      if (deliverTomorrow) throw new Error("Evening sync collided with another Household sync");
+      return { outcome: "skipped_locked" as const };
+    }
 
+    let result: { messagesExtracted: number; inputTokens: number; outputTokens: number };
     try {
-      const result = await step.run("fetch-and-ingest", () =>
+      result = await step.run("fetch-and-ingest", () =>
         fetchAndIngestForHousehold(householdId, ownerUserId, { paginate: false }),
       );
 
       await step.run("mark-idle", () =>
         markHouseholdSyncIdle(householdId, { success: true, ...result }),
       );
-
-      return { outcome: "completed" as const, ...result };
     } catch (error) {
       await step.run("mark-idle-on-error", () =>
         markHouseholdSyncIdle(householdId, {
@@ -50,6 +59,18 @@ export const syncHouseholdFn = inngest.createFunction(
       );
       throw error; // re-throw so Inngest retries
     }
+
+    if (deliverTomorrow) {
+      await step.run("compose-and-deliver-tomorrow", async () => {
+        const delivery = await deliverTomorrowForOwner(householdId, ownerUserId);
+        if (delivery.some(({ outcome }) => outcome === "failed")) {
+          throw new Error("Day Plan SMS delivery failed");
+        }
+        return delivery;
+      });
+    }
+
+    return { outcome: "completed" as const, ...result };
   },
 );
 
@@ -61,7 +82,7 @@ export const syncHouseholdFn = inngest.createFunction(
 export const scheduledSweepFn = inngest.createFunction(
   {
     id: "scheduled-sweep",
-    triggers: [{ cron: "0 7 * * *" }, { cron: "30 12 * * *" }, { cron: "30 17 * * *" }],
+    triggers: [{ cron: "0 7 * * *" }, { cron: "30 12 * * *" }],
   },
   async ({ step }) => {
     const startedAt = new Date();
@@ -97,6 +118,74 @@ export const scheduledSweepFn = inngest.createFunction(
     );
 
     return { householdsQueued: households.length, runId };
+  },
+);
+
+// The evening sweep is separate so every per-Household workflow can compose and
+// deliver only after its own sync has completed successfully.
+export const eveningSweepFn = inngest.createFunction(
+  {
+    id: "evening-sweep",
+    triggers: [{ cron: "30 17 * * *" }],
+  },
+  async ({ step }) => {
+    const startedAt = new Date();
+    const runId = crypto.randomUUID();
+    const households = await step.run("list-households", () =>
+      db.select({ id: household.id, ownerUserId: household.ownerUserId }).from(household),
+    );
+    await step.sendEvent(
+      "fan-out-evening-sync-events",
+      households.map(({ id, ownerUserId }) =>
+        householdSyncEvent.create({ householdId: id, ownerUserId, deliverTomorrow: true }),
+      ),
+    );
+    await step.run("record-sweep-run", () =>
+      db.insert(syncRun).values({
+        id: runId,
+        startedAt,
+        finishedAt: new Date(),
+        householdsProcessed: households.length,
+        messagesExtracted: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        failureCount: 0,
+        isBackfill: false,
+        anomaly: false,
+      }),
+    );
+    return { householdsQueued: households.length, runId };
+  },
+);
+
+export const retryDayPlanDeliveryFn = inngest.createFunction(
+  {
+    id: "retry-day-plan-delivery",
+    triggers: [{ event: dayPlanDeliveryRetryEvent }],
+    concurrency: { key: "event.data.householdId", limit: 1 },
+    retries: 2,
+  },
+  async ({ event, step }) => {
+    const [householdRow] = await step.run("load-household-owner", () =>
+      db
+        .select({ ownerUserId: household.ownerUserId })
+        .from(household)
+        .where(eq(household.id, event.data.householdId))
+        .limit(1),
+    );
+    if (!householdRow) return { outcome: "household_missing" as const };
+
+    return step.run("retry-delivery", async () => {
+      const delivery = await deliverDayPlanForOwner(
+        event.data.householdId,
+        householdRow.ownerUserId,
+        event.data.planDate,
+      );
+      if (delivery.some(({ outcome }) => outcome === "failed")) {
+        throw new Error("Day Plan SMS delivery retry failed");
+      }
+      return delivery;
+    });
   },
 );
 
@@ -158,4 +247,10 @@ export const backfillHouseholdFn = inngest.createFunction(
   },
 );
 
-export const allFunctions = [syncHouseholdFn, scheduledSweepFn, backfillHouseholdFn];
+export const allFunctions = [
+  syncHouseholdFn,
+  scheduledSweepFn,
+  eveningSweepFn,
+  retryDayPlanDeliveryFn,
+  backfillHouseholdFn,
+];
