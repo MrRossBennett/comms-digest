@@ -14,6 +14,7 @@ import { TooltipButton } from "@repo/ui/components/tooltip-button";
 import { useMutation } from "@tanstack/react-query";
 import { createFileRoute, Link, redirect, useRouter } from "@tanstack/react-router";
 import {
+  CalendarIcon,
   CheckIcon,
   EyeOffIcon,
   FileTextIcon,
@@ -261,7 +262,7 @@ function DayPlanGroups({
   const fyiOf = (entries: DayPlanEntry[]) =>
     entries.filter((entry) => entry.source === "claim" && matchesChild(entry));
 
-  const goodToKnow = [...fyiOf(dayPlan.today), ...fyiOf(dayPlan.comingUp)];
+  const keyDates = [...fyiOf(dayPlan.today), ...fyiOf(dayPlan.comingUp)];
 
   return (
     <div className="grid gap-8">
@@ -295,11 +296,11 @@ function DayPlanGroups({
         {...sharedProps}
       />
       <DayPlanSection
-        id="good-to-know"
-        title="Good to know"
-        tone="muted"
-        description="Events and updates from school — nothing to action."
-        entries={goodToKnow}
+        id="key-dates"
+        title="Key dates"
+        tone="separated"
+        description="Events coming up — worth a note in the diary, nothing to action."
+        entries={keyDates}
         {...sharedProps}
       />
     </div>
@@ -325,7 +326,7 @@ function DayPlanSection({
   id: string;
   title: string;
   description?: string;
-  tone?: "danger" | "muted";
+  tone?: "danger" | "separated";
   entries: DayPlanEntry[];
   emptyMessage?: string;
   communications: SchoolCommunication[];
@@ -342,7 +343,7 @@ function DayPlanSection({
   return (
     <section
       aria-labelledby={`${id}-heading`}
-      className={tone === "muted" ? "border-t pt-8" : undefined}
+      className={tone === "separated" ? "border-t pt-8" : undefined}
     >
       <div className="mb-3">
         <h2
@@ -413,6 +414,12 @@ function DayPlanEntryCard({
       <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6">
         <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap gap-2">
+            {entry.source === "claim" && entry.date ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                <CalendarIcon className="size-3" />
+                {formatDate(entry.date)}
+              </span>
+            ) : null}
             {entry.source === "routine" ? (
               <span className="inline-flex rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
                 Household Routine
@@ -512,9 +519,9 @@ function entryDetail(entry: DayPlanEntry, routine?: HouseholdRoutine) {
   if (!entry.date) {
     return entry.receivedAt ? `From ${formatDateTime(entry.receivedAt)}` : undefined;
   }
-  return entry.source === "responsibility"
-    ? `Due ${formatDate(entry.date)}`
-    : formatDate(entry.date);
+  // Events (claims) show their date as a calendar pill instead, so only
+  // responsibilities need a "Due" line here.
+  return entry.source === "responsibility" ? `Due ${formatDate(entry.date)}` : undefined;
 }
 
 function routineSchedule(routine?: HouseholdRoutine) {
