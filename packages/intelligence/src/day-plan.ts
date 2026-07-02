@@ -21,6 +21,11 @@ const composeDayPlanInputSchema = z
     completedResponsibilityIds: z.array(z.uuid()),
     dismissedClaimIds: z.array(z.uuid()),
     dismissedResponsibilityIds: z.array(z.uuid()),
+    // When a Responsibility has no resolved due date, we fall back to the date
+    // its email arrived — as a recency signal for ordering, never as a deadline.
+    receivedAtByResponsibilityId: z
+      .record(z.string(), z.iso.datetime({ offset: true }))
+      .default({}),
     referenceDate: z.iso.date(),
     horizonDays: z.int().positive().default(7),
   })
@@ -32,6 +37,7 @@ const dayPlanEntrySchema = z
     title: z.string().min(1),
     childIds: z.array(z.uuid()),
     date: z.iso.date().nullable(),
+    receivedAt: z.iso.datetime({ offset: true }).optional(),
     responsibilityId: z.uuid().optional(),
     claimIds: z.array(z.uuid()).optional(),
     routineId: z.uuid().optional(),
@@ -58,6 +64,7 @@ export function composeDayPlan(input: unknown): DayPlan {
     completedResponsibilityIds,
     dismissedClaimIds,
     dismissedResponsibilityIds,
+    receivedAtByResponsibilityId,
     referenceDate,
     horizonDays,
   } = composeDayPlanInputSchema.parse(input);
@@ -90,6 +97,7 @@ export function composeDayPlan(input: unknown): DayPlan {
         title: responsibility.title,
         childIds: item.childIds,
         date: responsibility.dueDate?.resolvedDate ?? null,
+        receivedAt: receivedAtByResponsibilityId[responsibility.id],
         responsibilityId: responsibility.id,
         claimIds: responsibility.supportingClaimIds,
       };
@@ -140,12 +148,19 @@ export function composeDayPlan(input: unknown): DayPlan {
     entries.sort(
       (a, b) => (a.date ?? "").localeCompare(b.date ?? "") || a.title.localeCompare(b.title),
     );
+  // Undated to-dos carry no deadline, so order them by the email that surfaced
+  // them, most recent first.
+  const sortByReceivedAtDesc = (entries: DayPlanEntry[]) =>
+    entries.sort(
+      (a, b) =>
+        (b.receivedAt ?? "").localeCompare(a.receivedAt ?? "") || a.title.localeCompare(b.title),
+    );
 
   return dayPlanSchema.parse({
     date: referenceDate,
     overdue: sortEntries(overdue),
     today: sortEntries(today),
-    noDate: sortEntries(noDate),
+    noDate: sortByReceivedAtDesc(noDate),
     comingUp: sortEntries(comingUp),
   });
 }

@@ -179,7 +179,17 @@ export async function getHouseholdDigestForOwner(ownerUserId: string) {
       completedResponsibilityIds: [],
       dismissedClaimIds: [],
       dismissedResponsibilityIds: [],
+      receivedAtByResponsibilityId: {},
     };
+  }
+
+  // Each Responsibility is extracted from exactly one communication, so we can
+  // fall back to that email's date when it carries no resolved deadline.
+  const receivedAtByResponsibilityId: Record<string, string> = {};
+  for (const extraction of extractions) {
+    for (const responsibility of extraction.responsibilities) {
+      receivedAtByResponsibilityId[responsibility.id] = extraction.communication.receivedAt;
+    }
   }
 
   const householdConfig = {
@@ -205,6 +215,7 @@ export async function getHouseholdDigestForOwner(ownerUserId: string) {
     completedResponsibilityIds: await listCompletedResponsibilityIds(ownerUserId),
     dismissedClaimIds: dismissed.claimIds,
     dismissedResponsibilityIds: dismissed.responsibilityIds,
+    receivedAtByResponsibilityId,
   };
 }
 

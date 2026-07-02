@@ -288,9 +288,9 @@ function DayPlanGroups({
         {...sharedProps}
       />
       <DayPlanSection
-        id="anytime"
-        title="Anytime"
-        description="No date yet — do these when you can."
+        id="no-deadline"
+        title="Earlier emails"
+        description="No deadline — most recent first."
         entries={todosOf(dayPlan.noDate)}
         {...sharedProps}
       />
@@ -509,7 +509,9 @@ function entryDetail(entry: DayPlanEntry, routine?: HouseholdRoutine) {
       .filter(Boolean)
       .join(" · ");
   }
-  if (!entry.date) return undefined;
+  if (!entry.date) {
+    return entry.receivedAt ? `From ${formatDateTime(entry.receivedAt)}` : undefined;
+  }
   return entry.source === "responsibility"
     ? `Due ${formatDate(entry.date)}`
     : formatDate(entry.date);
