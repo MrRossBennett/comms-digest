@@ -12,12 +12,14 @@ function digestItem({
   claimDate,
   responsibilityDueDate,
   claimId: itemClaimId = claimId,
+  responsibilityId: itemResponsibilityId = responsibilityId,
 }: {
   title: string;
   childIds?: string[];
   claimDate?: string;
   responsibilityDueDate?: string | null;
   claimId?: string;
+  responsibilityId?: string;
 }) {
   return {
     title,
@@ -45,7 +47,7 @@ function digestItem({
         ? []
         : [
             {
-              id: responsibilityId,
+              id: itemResponsibilityId,
               title,
               dueDate:
                 responsibilityDueDate === null
@@ -138,6 +140,41 @@ test("an unresolved responsibility with no resolved date lands only in noDate", 
   expect(plan.overdue).toHaveLength(0);
   expect(plan.today).toHaveLength(0);
   expect(plan.comingUp).toHaveLength(0);
+});
+
+test("undated responsibilities carry their email date, never go overdue, and sort newest first", () => {
+  const olderResponsibilityId = "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c22";
+  const digest = {
+    ...emptyDigest(),
+    actNow: [
+      digestItem({
+        title: "Join the PTA WhatsApp",
+        responsibilityDueDate: null,
+        claimId: "018f1f5e-7b5a-7cc0-9d26-7f4f6fc97c31",
+        responsibilityId: olderResponsibilityId,
+      }),
+      digestItem({ title: "Order school photos", responsibilityDueDate: null }),
+    ],
+  };
+
+  const plan = composeDayPlan(
+    baseInput({
+      digest,
+      // Both emails predate the reference date; an undated to-do must never read
+      // as overdue just because its email is old.
+      receivedAtByResponsibilityId: {
+        [responsibilityId]: "2026-06-01T09:00:00.000Z",
+        [olderResponsibilityId]: "2026-05-20T09:00:00.000Z",
+      },
+    }),
+  );
+
+  expect(plan.overdue).toHaveLength(0);
+  expect(plan.noDate.map(({ title }) => title)).toEqual([
+    "Order school photos",
+    "Join the PTA WhatsApp",
+  ]);
+  expect(plan.noDate[0]).toMatchObject({ receivedAt: "2026-06-01T09:00:00.000Z" });
 });
 
 test("items dated within the horizon land in comingUp; beyond the horizon they are excluded", () => {

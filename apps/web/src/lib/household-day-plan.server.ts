@@ -27,6 +27,7 @@ export async function getDayPlanForOwner(ownerUserId: string) {
     completedResponsibilityIds: digestData.completedResponsibilityIds,
     dismissedClaimIds: digestData.dismissedClaimIds,
     dismissedResponsibilityIds: digestData.dismissedResponsibilityIds,
+    receivedAtByResponsibilityId: digestData.receivedAtByResponsibilityId,
     referenceDate,
   });
 
