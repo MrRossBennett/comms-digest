@@ -3,7 +3,7 @@ import { household, syncRun } from "@repo/db/schema";
 import { eq } from "drizzle-orm";
 
 import { deliverDayPlanForOwner, deliverTomorrowForOwner } from "#/lib/day-plan-delivery.server";
-import { fetchAndIngestForHousehold } from "#/lib/household-digest.server";
+import { fetchAndIngestForHousehold } from "#/lib/household-ingestion.server";
 import { markHouseholdSyncIdle, tryMarkHouseholdSyncRunning } from "#/lib/household-sync.server";
 import { isRootCauseReauth } from "#/lib/sync-error";
 

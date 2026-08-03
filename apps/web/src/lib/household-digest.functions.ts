@@ -4,10 +4,8 @@ import { setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 
 import { setEvidenceDismissed, setResponsibilityCompleted } from "./evidence-status.server";
-import {
-  fetchNewCommunicationsForOwner,
-  getHouseholdDigestForOwner,
-} from "./household-digest.server";
+import { getHouseholdDigestForOwner } from "./household-digest.server";
+import { fetchNewCommunicationsForOwner } from "./household-sync.server";
 
 const uniqueUuidArray = z
   .array(z.uuid())
